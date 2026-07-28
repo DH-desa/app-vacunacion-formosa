@@ -24,11 +24,11 @@ Se agrupa en tres ciclos, de mayor a menor duración:
 `reiniciarCicloBeneficiario()`.
 
 **Punto único de reinicio del ciclo vacuna** (sin cambiar de persona):
-`confirmaciondatos_page.dart:601`, botón «Sí, otra vacuna».
+`vacunas_page.dart`, `_registrarVacunacion()`, botón «Sí, otra vacuna».
 
 La «sesión de vacunación» (cargar la persona una vez, registrar varias vacunas)
 está implementada como: ciclo persona + pregunta post-registro
-«¿Aplicar otra vacuna a la misma persona?» (`confirmaciondatos_page.dart:610`).
+«¿Aplicar otra vacuna a la misma persona?» (`vacunas_page.dart`, `_registrarVacunacion()`).
 
 ---
 
@@ -97,44 +97,53 @@ transcripción literal de `docs/calendario_nacional_vacunacion_2026.md`
 **Puramente informativo, en bottom sheet** (`_mostrarCalendarioSheet()`,
 ícono en el `AppBar`, `Icons.calendar_month_outlined`): antes vivía siempre
 expandido en el medio del flujo vertical de `VacunasPage` y era el bloque
-más alto de la pantalla, empujando el formulario. `containerBeneficiario`
-sí conserva un resumen liviano de las filas clasificadas —solo chips de
-etiqueta (`_bloqueFilasCalendario`, sin el detalle vacuna+indicación)—
-dentro de su cuerpo colapsable.
+más alto de la pantalla, empujando el formulario. No hay ninguna otra
+vista que repita esta clasificación: el sheet es la única fuente.
 
-Situación editable sin re-buscar: `_bloqueSituacionInline()` en
-`VacunasPage`, dentro del cuerpo colapsable de `containerBeneficiario()`
-(no es un bloque aparte), reusa `SituacionBeneficiario` contra
-`situacionBeneficiarioService` directamente. La tarjeta arranca expandida
-si ya hay situación cargada (`condicionGestacional != null` o
-`esPersonalDeSalud`), para que ese dato no quede oculto detrás de un tap.
+Situación editable sin re-buscar: `_bloqueSituacionInline()` (`vacunas_page.dart`),
+reusa `SituacionBeneficiario` contra `situacionBeneficiarioService`
+directamente. Vive dentro del bottom sheet de detalle del beneficiario
+(`_mostrarDetalleBeneficiarioSheet()`, ver sección 4) — no en una tarjeta
+aparte del scroll.
 
-### 4. Layout de `VacunasPage` — banners fijos + barra de acciones fija
+### 4. Layout de `VacunasPage` — banner fijo + sheet único + barra de acciones fija
 
-Reescrito completo tras detectar que el formulario (lo importante de la
-pantalla) quedaba debajo de bloques informativos siempre expandidos, y que
-la acción de avance del paso 8 exigía scrollear toda la página.
+Reescrito dos veces: primero se agregaron banners y sheets fijos sin
+retirar la tarjeta de beneficiario del scroll (`containerBeneficiario()`),
+lo que terminó **triplicando** la identidad (banner + tarjeta + sheet) y
+duplicando el calendario (chips en la tarjeta + sheet). Ese error quedó
+documentado como incoherencia #9 y fue corregido eliminando la tarjeta:
+ahora hay una sola fuente por dato, no una copia por pantalla.
 
 - **`_bannerIdentidad()`**: fuera del `SingleChildScrollView` (en un `Column`
   con `Expanded` alrededor del scroll), una línea fija con nombre · DNI (+
   «MENOR» si `_beneficiarioRequierePanelTutor()`). Tocar abre
-  `_mostrarDetalleBeneficiarioSheet()` (bottom sheet con el detalle
-  completo, mismas filas que `containerBeneficiario`). No reemplaza a
-  `containerBeneficiario`, que sigue más abajo colapsable con el resto de
-  los datos y la situación.
+  `_mostrarDetalleBeneficiarioSheet()` — **único** lugar con el detalle
+  completo del beneficiario y la situación editable. No existe ninguna otra
+  tarjeta de beneficiario en `VacunasPage`.
+- **`_mostrarDetalleBeneficiarioSheet()`**: detalle completo
+  (`_filasDetalleBeneficiario`) + situación editable (`_bloqueSituacionInline()`,
+  incluye condición gestacional y el switch «Personal de salud» — antes vivía
+  en la tarjeta eliminada). Nota de alcance: el switch «Personal de salud» no
+  filtra el catálogo de vacunas del paso 2 (`obtenerVacunasxPerfilesProviders`
+  no recibe ese parámetro); solo alimenta el calendario informativo y el
+  campo `es_personal_salud` del registro. Bajarlo de la tarjeta protagonista
+  a este sheet reduce su jerarquía visual a lo que realmente hace.
 - **`_bannerAlertaTutor()`**: también fijo, visible solo si
   `_beneficiarioRequierePanelTutor()` y no hay tutor cargado. Tocar
   scrollea hasta `containerTutor()` (`Scrollable.ensureVisible` sobre
   `_tutorSectionKey`) en vez de obligar a bajar a ciegas.
 - **`_barraAccionesFija()`** (`bottomNavigationBar` del `Scaffold`): «Cancelar»
   siempre visible + la acción de avance del paso actual, cuando ese paso
-  tiene una (paso 6 Fecha → `_cargarLotesYAvanzar`; paso 8 Verificar →
-  `_alPresionarContinuarRegistro`). Los demás pasos (Perfil, Vacuna,
-  Condición, Esquema, Lote) avanzan solo con tocar una opción de la lista,
-  sin botón propio — no se les agregó uno.
-- **`_seccionVacunasVisita()`**: pasó de tarjeta con lista completa a una
-  línea («N aplicadas en esta visita»); tocarla abre el mismo bottom sheet
-  de historial (`_mostrarHistorialDosis()`, botón del `AppBar`).
+  tiene una (paso 6 Fecha → `_cargarLotesYAvanzar`; paso 8 Confirmar →
+  `_alPresionarContinuarRegistro` → `_registrarVacunacion`). El segundo slot
+  se reserva siempre con `Visibility(maintainSize: true)` aunque no haya
+  acción, para que la barra no cambie de alto ni de ancho entre pasos. Los
+  demás pasos (Perfil, Vacuna, Condición, Esquema, Dosis, Lote) avanzan solo
+  con tocar una opción de la lista, sin botón propio.
+- **`_seccionVacunasVisita()`**: línea compacta («N aplicadas en esta
+  visita»); tocarla abre el mismo bottom sheet de historial
+  (`_mostrarHistorialDosis()`, botón del `AppBar`).
 
 ### 5. Registro — wizard de 8 pasos
 
@@ -172,35 +181,43 @@ la acción de avance del paso 8 exigía scrollear toda la página.
   (`notificacionesDosisService.listaDosisAplicadas`) y contra lo ya
   registrado en la visita (`insertRegistroService.visitaRegistros`). Si
   coincide, diálogo «Vacuna ya registrada» con «Continuar igual» / «Volver»
-  antes de ir a `ConfirmarDatos`.
+  antes de registrar.
 
-### 6. Confirmación y envío
+### 6. Confirmación y envío — fusionado en el paso 8
 
-`ConfirmarDatos` (revisión final) → POST `insertRegistroProd`
-(`confirmaciondatos_page.dart:565`). El resumen de vacuna/dosis/lote se
-muestra siempre expandido (cambia en cada vacuna). Las tarjetas de
-beneficiario y tutor arrancan expandidas solo en la 1ª vacuna de la visita
-(`insertRegistroService.visitaRegistros` vacía); desde la 2ª arrancan
-colapsadas — ya se revisaron antes — y un toque las expande
-(`confirmaciondatos_page.dart`, `initState`).
+Antes existía una pantalla aparte (`ConfirmarDatos`, «Revisión final») que
+repetía el mismo resumen de vacuna/dosis/lote que ya mostraba el paso 8
+(«Revisar selección») y las mismas tarjetas de beneficiario/tutor que el
+banner y el sheet de detalle ya mostraban — dos revisiones idénticas
+seguidas. Se eliminó esa pantalla: el paso 8 (`containerVerificar()`,
+título «Confirmar y registrar») es ahora la pantalla de confirmación y
+registro en sí misma. El botón «Registrar» de la barra fija dispara
+`_registrarVacunacion()` (`vacunas_page.dart`), que:
+
+1. `insertRegistroService.cargarRegistro(_construirRegistro())`.
+2. POST `sistemaRepository.insertRegistroProd()`, con overlay de carga
+   (`_overlayRegistrando()`) mientras `_registrando == true`.
+3. Si `codigo_mensaje == '0'`: error, diálogo «Reintentar» (queda en el
+   paso 8, no se pierde la selección).
+4. Si no: éxito. Se suma a `insertRegistroService.visitaRegistrosEstado`
+   («vacunas de esta visita», ciclo persona) y se pregunta «¿Aplicar otra
+   vacuna a la misma persona?».
+   - «Sí, otra vacuna» → `_refrescarHistorialDosis()` (recarga
+     `notificacionesDosisService` para que la vacuna recién aplicada
+     aparezca en el historial) → `reiniciarCicloVacuna()` → `VacunasPage`
+     (misma persona).
+   - «No, finalizar» → `BusquedaBeneficiario` → reinicio total del ciclo
+     persona.
 
 Convención `codigo_mensaje` (verificada en llamadas, no en el PHP):
 - Beneficiario: `'0'` = error/no encontrado (`busquedabeneficiario_page.dart:392`).
 - Notificaciones: `'1'` = hay dosis (`busquedabeneficiario_page.dart:386`).
-- Insert: `'0'` = error, reintentar (`confirmaciondatos_page.dart:568`).
+- Insert: `'0'` = error, reintentar (`vacunas_page.dart`, `_registrarVacunacion`).
 
-Post-registro OK (`confirmaciondatos_page.dart:586-616`):
-- Antes del diálogo, el registro se suma a
-  `insertRegistroService.visitaRegistrosEstado` («vacunas de esta visita»,
-  ciclo persona) sin importar qué botón se elija después.
-- «Sí, otra vacuna» → `reiniciarCicloVacuna()` → `VacunasPage` (misma persona).
-- «No, finalizar» → `BusquedaBeneficiario` → reinicio total del ciclo persona.
-
-«Vacunas de esta visita»: tarjeta con las vacunas ya confirmadas en la visita
-en curso, visible en `VacunasPage` (`_seccionVacunasVisita()`, debajo de
-`containerBeneficiario()`) y en `ConfirmarDatos` (arriba del resumen de la
-vacuna a confirmar). Oculta si la lista está vacía (primera vacuna de la
-visita).
+«Vacunas de esta visita»: una sola fuente de UI (`_seccionVacunasVisita()`
+en `VacunasPage`, línea compacta que abre el sheet de historial). Antes se
+mostraba una segunda vez, como lista completa, en `ConfirmarDatos` — esa
+pantalla ya no existe.
 
 ---
 
@@ -267,3 +284,22 @@ Tachadas: ya resueltas (Fases 1-8 del plan, completo).
    «Layout de `VacunasPage`» arriba — calendario a bottom sheet, situación
    dentro de `containerBeneficiario` (colapsable), visita a una línea,
    acciones de avance a barra fija.
+10. ~~Patrón sistémico: cada pantalla nueva del flujo repetía desde cero un
+    dato que otra pantalla ya mostraba, en vez de reutilizar una única
+    fuente. Encontrado en cuatro dominios a la vez: identidad del
+    beneficiario (banner + tarjeta + sheet + `ConfirmarDatos`, hasta 4
+    veces), resumen de la vacuna elegida (chips del header + paso 8 +
+    `ConfirmarDatos`, 3 veces), «vacunas de esta visita» (línea + sheet +
+    `ConfirmarDatos`, 3 veces, con dos fuentes de datos paralelas
+    reconciliadas por nombre) y calendario/situación (chips + sheet, 2
+    veces). Causa: cada capa nueva se copió del layout anterior en vez de
+    reusarlo. Esto fue lo que introdujo la incoherencia #9 (la propia
+    corrección anterior).~~ Resuelto: se eliminó `containerBeneficiario()`
+    (dejó una sola fuente para identidad y situación: banner + sheet); se
+    eliminó `ConfirmarDatos` fusionando la confirmación y el registro en el
+    paso 8 (dejó una sola fuente para el resumen de vacuna y para «vacunas
+    de esta visita»). De paso, se corrigió un bug de correctitud encontrado
+    en el camino: `containerPerfiles()`/`_heredarPerfilDeLaVisita()`
+    indexaban `tempLista[0]` sin chequear que `obtenerVacunasxPerfilesProviders`
+    puede devolver `0` (`int`, sin vacunas configuradas para el perfil) en
+    vez de una `List` — crash potencial, ahora con guardia de tipo.

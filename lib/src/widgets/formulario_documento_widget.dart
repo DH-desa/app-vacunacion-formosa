@@ -208,6 +208,7 @@ class _FormularioDocumentoState extends State<FormularioDocumento> {
 
   Widget _campoDni(ColorScheme cs, TextTheme tt) {
     return Container(
+      clipBehavior: Clip.antiAlias,
       decoration: AppSuperficies.campoBusqueda(context),
       child: TextField(
         autocorrect: false,

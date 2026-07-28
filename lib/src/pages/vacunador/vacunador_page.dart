@@ -605,8 +605,8 @@ class _VacunadorPageState extends State<VacunadorPage> {
     showModalBottomSheet<void>(
       useRootNavigator: true,
       context: context,
-      backgroundColor: Colors.transparent,
       isScrollControlled: true,
+      showDragHandle: true,
       builder: (BuildContext sheetContext) {
         return DraggableScrollableSheet(
           initialChildSize: 0.55,
@@ -614,63 +614,39 @@ class _VacunadorPageState extends State<VacunadorPage> {
           maxChildSize: 0.92,
           expand: false,
           builder: (context, scrollController) {
-            return Container(
-              decoration: BoxDecoration(
-                color: cs.surface,
-                borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(24),
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: cs.shadow.withValues(alpha: 0.2),
-                    blurRadius: 20,
-                    offset: const Offset(0, -4),
+            return Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(
+                    AppEspaciado.lg,
+                    AppEspaciado.sm,
+                    AppEspaciado.lg,
+                    AppEspaciado.sm,
                   ),
-                ],
-              ),
-              child: Column(
-                children: [
-                  const SizedBox(height: 10),
-                  Container(
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: cs.outlineVariant.withValues(alpha: 0.65),
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(
-                      AppEspaciado.lg,
-                      AppEspaciado.lg,
-                      AppEspaciado.lg,
-                      AppEspaciado.sm,
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(Icons.local_hospital_rounded, color: cs.primary),
-                        const SizedBox(width: AppEspaciado.sm),
-                        Text(
-                          'Efectores',
-                          style: tt.titleLarge?.copyWith(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w700,
-                            color: cs.onSurface,
-                          ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.local_hospital_rounded, color: cs.primary),
+                      const SizedBox(width: AppEspaciado.sm),
+                      Text(
+                        'Efectores',
+                        style: tt.titleLarge?.copyWith(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w700,
+                          color: cs.onSurface,
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
-                  Expanded(
-                    child: _ListaEfectoresHoja(
-                      scrollController: scrollController,
-                      efectoresCargando: _efectoresCargando,
-                      mensajeError: _efectoresMensajeError,
-                      onReintentar: _cargarListaEfectoresInicial,
-                    ),
+                ),
+                Expanded(
+                  child: _ListaEfectoresHoja(
+                    scrollController: scrollController,
+                    efectoresCargando: _efectoresCargando,
+                    mensajeError: _efectoresMensajeError,
+                    onReintentar: _cargarListaEfectoresInicial,
                   ),
-                ],
-              ),
+                ),
+              ],
             );
           },
         );

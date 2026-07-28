@@ -1,5 +1,7 @@
 import 'package:sistema_vacunacion/src/domain/entities/models.dart';
 import 'package:sistema_vacunacion/src/presentation/state/tutor_service.dart';
+import 'package:sistema_vacunacion/src/utils/edad_beneficiario.dart';
+import 'package:sistema_vacunacion/src/utils/edad_pdf417_dni_arg.dart';
 
 import 'estado.dart';
 
@@ -17,6 +19,22 @@ class _BeneficiariorService {
   String? get fechaNacimientoDesdePdf417Escaneado => fechaNacEstado.value;
 
   bool get existeBeneficiario => beneficiarioEstado.value != null;
+
+  /// Edad en días de vida (`wserv_listados_vacunas.php` la espera así, a
+  /// diferencia del resto de la app que usa años). Prioridad PDF417 sobre
+  /// dato del API, igual criterio que [edadAniosDesdePdf417Escaneado].
+  String? get diasDeVidaBeneficiario {
+    final dias =
+        diasDeVidaDesdeFechaNacimientoTexto(fechaNacimientoDesdePdf417Escaneado) ??
+        (() {
+          final nacimiento =
+              parseFechaNacimiento(beneficiario?.sysdesa10_fecha_nacimiento);
+          return nacimiento == null
+              ? null
+              : diasDeVidaDesde(nacimiento, DateTime.now());
+        })();
+    return dias?.toString();
+  }
 
   void cargarBeneficiario(
     Beneficiario? beneficiario, {

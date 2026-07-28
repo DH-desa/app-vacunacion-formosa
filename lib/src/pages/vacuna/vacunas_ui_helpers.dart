@@ -16,7 +16,7 @@ const List<_PasoMeta> _metasPasosVacunas = [
   _PasoMeta('Dosis', Icons.numbers_outlined),
   _PasoMeta('Fecha', Icons.calendar_today_outlined),
   _PasoMeta('Lote', Icons.inventory_2_outlined),
-  _PasoMeta('Revisar', Icons.fact_check_outlined),
+  _PasoMeta('Confirmar', Icons.fact_check_outlined),
 ];
 
 const List<Color> _coloresPasosVacunas = [
@@ -80,12 +80,43 @@ class _VacunasPanelFlujoState extends State<VacunasPanelFlujo> {
   void _actualizarItems() {
     _items.clear();
     _items.addAll([
-      _ItemSeleccion(numeroPaso: 1, nombre: 'Perfil', valor: widget.perfil, indiceColor: 0),
-      _ItemSeleccion(numeroPaso: 2, nombre: 'Vacuna', valor: widget.vacuna, indiceColor: 1),
-      _ItemSeleccion(numeroPaso: 3, nombre: 'Condición', valor: widget.condicion, indiceColor: 2),
-      _ItemSeleccion(numeroPaso: 4, nombre: 'Esquema', valor: widget.esquema, indiceColor: 3),
-      _ItemSeleccion(numeroPaso: 5, nombre: 'Dosis', valor: widget.dosis, indiceColor: 4),
-      _ItemSeleccion(numeroPaso: 7, nombre: 'Lote', valor: widget.lote, valorSecundario: widget.fecha, indiceColor: 5),
+      _ItemSeleccion(
+        numeroPaso: 1,
+        nombre: 'Perfil',
+        valor: widget.perfil,
+        indiceColor: 0,
+      ),
+      _ItemSeleccion(
+        numeroPaso: 2,
+        nombre: 'Vacuna',
+        valor: widget.vacuna,
+        indiceColor: 1,
+      ),
+      _ItemSeleccion(
+        numeroPaso: 3,
+        nombre: 'Condición',
+        valor: widget.condicion,
+        indiceColor: 2,
+      ),
+      _ItemSeleccion(
+        numeroPaso: 4,
+        nombre: 'Esquema',
+        valor: widget.esquema,
+        indiceColor: 3,
+      ),
+      _ItemSeleccion(
+        numeroPaso: 5,
+        nombre: 'Dosis',
+        valor: widget.dosis,
+        indiceColor: 4,
+      ),
+      _ItemSeleccion(
+        numeroPaso: 7,
+        nombre: 'Lote',
+        valor: widget.lote,
+        valorSecundario: widget.fecha,
+        indiceColor: 5,
+      ),
     ]);
   }
 
@@ -94,7 +125,8 @@ class _VacunasPanelFlujoState extends State<VacunasPanelFlujo> {
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
 
-    final nombrePaso = (widget.pasoActual >= 1 &&
+    final nombrePaso =
+        (widget.pasoActual >= 1 &&
             widget.pasoActual <= _metasPasosVacunas.length)
         ? _metasPasosVacunas[widget.pasoActual - 1].etiqueta
         : '';
@@ -126,10 +158,15 @@ class _VacunasPanelFlujoState extends State<VacunasPanelFlujo> {
                 Row(
                   children: [
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
                       decoration: BoxDecoration(
                         color: cs.primary.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(AppEspaciado.radioCampo),
+                        borderRadius: BorderRadius.circular(
+                          AppEspaciado.radioCampo,
+                        ),
                       ),
                       child: Text(
                         'PASO ${widget.pasoActual} DE ${_metasPasosVacunas.length}',
@@ -215,11 +252,16 @@ class _ChipCompacto extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final oscuro = cs.brightness == Brightness.dark;
     final colorBase = _coloresPasosVacunas[item.indiceColor];
-    final fondo = oscuro ? colorBase.withValues(alpha: 0.22) : colorBase.withValues(alpha: 0.12);
-    final borde = oscuro ? colorBase.withValues(alpha: 0.75) : colorBase.withValues(alpha: 0.55);
+    final fondo = oscuro
+        ? colorBase.withValues(alpha: 0.22)
+        : colorBase.withValues(alpha: 0.12);
+    final borde = oscuro
+        ? colorBase.withValues(alpha: 0.75)
+        : colorBase.withValues(alpha: 0.55);
     final texto = oscuro ? colorBase.withValues(alpha: 1.0) : colorBase;
 
-    final valorCompleto = item.valorSecundario != null && item.valorSecundario!.isNotEmpty
+    final valorCompleto =
+        item.valorSecundario != null && item.valorSecundario!.isNotEmpty
         ? '${item.valor} · ${item.valorSecundario}'
         : item.valor!;
 
@@ -229,7 +271,10 @@ class _ChipCompacto extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(AppEspaciado.sm),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: AppEspaciado.sm, vertical: 5),
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppEspaciado.sm,
+            vertical: 5,
+          ),
           decoration: BoxDecoration(
             color: fondo,
             borderRadius: BorderRadius.circular(AppEspaciado.sm),
@@ -242,7 +287,11 @@ class _ChipCompacto extends StatelessWidget {
               const SizedBox(width: 4),
               Text(
                 '${item.nombre}: ',
-                style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: texto),
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: texto,
+                ),
               ),
               ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 120),
@@ -250,7 +299,11 @@ class _ChipCompacto extends StatelessWidget {
                   valorCompleto,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: texto),
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: texto,
+                  ),
                 ),
               ),
             ],

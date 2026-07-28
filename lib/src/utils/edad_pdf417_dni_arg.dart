@@ -63,3 +63,29 @@ int? aniosCumplidosDesdeFechaNacimientoTexto(String? raw) {
   if (anios < 0 || anios > 120) return null;
   return anios;
 }
+
+/// Días de vida desde el texto de fecha del DNI (DD/MM/AAAA o ISO).
+int? diasDeVidaDesdeFechaNacimientoTexto(String? raw) {
+  if (raw == null) return null;
+  final s = raw.toString().trim();
+  if (s.isEmpty) return null;
+  DateTime? dt;
+  if (RegExp(r'^\d{4}-\d{2}-\d{2}').hasMatch(s)) {
+    dt = DateTime.tryParse(s.length >= 10 ? s.substring(0, 10) : s);
+  }
+  if (dt == null) {
+    final m = RegExp(r'^(\d{1,2})/(\d{1,2})/(\d{4})').firstMatch(s);
+    if (m != null) {
+      final d = int.tryParse(m.group(1)!);
+      final mo = int.tryParse(m.group(2)!);
+      final y = int.tryParse(m.group(3)!);
+      if (d != null && mo != null && y != null) {
+        dt = DateTime(y, mo, d);
+      }
+    }
+  }
+  if (dt == null) return null;
+  final dias = DateTime.now().difference(dt).inDays;
+  if (dias < 0) return null;
+  return dias;
+}

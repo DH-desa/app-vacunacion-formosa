@@ -21,8 +21,8 @@ int? parseEdadAnios(String? raw) {
   return v;
 }
 
-/// Fecha de nacimiento desde el WS, formatos `yyyy-MM-dd` (con o sin hora) o
-/// `d/M/yyyy`. No calcula edad, solo parsea el `DateTime`.
+/// Fecha de nacimiento desde el WS, formatos `yyyy-MM-dd` (con o sin hora),
+/// `d/M/yyyy` o `d-M-yyyy`. No calcula edad, solo parsea el `DateTime`.
 DateTime? parseFechaNacimiento(String? raw) {
   if (raw == null) return null;
   final s = raw.toString().trim();
@@ -32,7 +32,7 @@ DateTime? parseFechaNacimiento(String? raw) {
     dt = DateTime.tryParse(s.substring(0, s.length >= 10 ? 10 : s.length));
   }
   if (dt == null) {
-    final m = RegExp(r'^(\d{1,2})/(\d{1,2})/(\d{4})').firstMatch(s);
+    final m = RegExp(r'^(\d{1,2})[/-](\d{1,2})[/-](\d{4})').firstMatch(s);
     if (m != null) {
       final d = int.tryParse(m.group(1)!);
       final mo = int.tryParse(m.group(2)!);
@@ -54,3 +54,8 @@ int edadAniosDesde(DateTime nacimiento, DateTime hoy) {
   }
   return anios;
 }
+
+/// Días de vida entre [nacimiento] y [hoy] (`wserv_listados_vacunas.php`
+/// espera la edad en días, no en años).
+int diasDeVidaDesde(DateTime nacimiento, DateTime hoy) =>
+    hoy.difference(nacimiento).inDays;

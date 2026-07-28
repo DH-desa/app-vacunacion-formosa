@@ -10,8 +10,22 @@ class SistemaRepositoryImpl implements SistemaRepository {
       insertRegistroProvider.insertRegistroProd();
 
   @override
-  Future validarNotificaciones(String? dni, String? sexo) =>
-      notificacionesProvider.validarNotificaciones(dni, sexo);
+  Future validarNotificaciones(
+    String? dni,
+    String? sexo, {
+    required bool embarazada,
+    required bool puerpera,
+    required bool personalSalud,
+    required String? edadDias,
+  }) =>
+      notificacionesProvider.validarNotificaciones(
+        dni,
+        sexo,
+        embarazada: embarazada,
+        puerpera: puerpera,
+        personalSalud: personalSalud,
+        edadDias: edadDias,
+      );
 
   @override
   Future validarVersionNuevaVersion(String nombreapp, String versionApp) =>

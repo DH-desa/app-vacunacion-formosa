@@ -14,6 +14,8 @@ class DialogoAlerta extends StatelessWidget {
   final Color? color;
   final Icon? icon;
   final bool dosBotones;
+  final Widget? contenido;
+  final List<Widget>? accionesExtra;
 
   const DialogoAlerta({
     Key? key,
@@ -28,6 +30,8 @@ class DialogoAlerta extends StatelessWidget {
     this.color,
     this.icon,
     this.dosBotones = false,
+    this.contenido,
+    this.accionesExtra,
   }) : super(key: key);
 
   @override
@@ -68,14 +72,24 @@ class DialogoAlerta extends StatelessWidget {
               ],
             ),
             const SizedBox(height: AppEspaciado.md),
-            Text(
-              descripcionAlerta ?? '',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    height: 1.4,
-                    color: AppSuperficies.textoSecundario(context),
-                  ),
-            ),
+            contenido ??
+                Text(
+                  descripcionAlerta ?? '',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        height: 1.4,
+                        color: AppSuperficies.textoSecundario(context),
+                      ),
+                ),
             const SizedBox(height: AppEspaciado.xl),
+            if (accionesExtra != null)
+              Column(
+                children: [
+                  for (final accion in accionesExtra!) ...[
+                    SizedBox(width: double.infinity, child: accion),
+                    const SizedBox(height: AppEspaciado.sm),
+                  ],
+                ],
+              ),
             if (dosBotones)
               Row(
                 children: [

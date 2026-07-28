@@ -329,6 +329,12 @@ class _EscanerDniState extends State<EscanerDni> {
                   ));
           break;
         }
+
+        // La situación (embarazada/puérpera/personal de salud) se pide antes
+        // de llamar al webservice: viaja en esa misma consulta.
+        final situacion = await _pedirSituacionBeneficiario();
+        if (situacion == null || !mounted) break;
+
         // Mostrar loading inmediatamente antes de la llamada a la API.
         // pushAndRemoveUntil lo descarta solo en el path exitoso;
         // el catch lo cierra manualmente antes de mostrar el error.
@@ -336,31 +342,20 @@ class _EscanerDniState extends State<EscanerDni> {
           context: context,
           barrierDismissible: false,
           barrierColor: Colors.black.withValues(alpha: .72),
-          builder: (ctx) => PopScope(
+          builder: (ctx) => const PopScope(
             canPop: false,
-            child: Dialog(
-              backgroundColor: Colors.transparent,
-              elevation: 0,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const LoadingEstrellas(),
-                  const SizedBox(height: AppEspaciado.lg),
-                  Text(
-                    'Buscando datos del beneficiario...',
-                    textAlign: TextAlign.center,
-                    style: Theme.of(ctx).textTheme.bodyMedium?.copyWith(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
-              ),
+            child: LoadingDialogEstrellas(
+              mensaje: 'Buscando datos del beneficiario...',
             ),
           ),
         ));
         try {
-          await obtenerDatosBeneficiario(dniPersona);
+          await obtenerDatosBeneficiario(
+            dniPersona,
+            embarazada: situacion.condicion == CondicionGestacional.embarazada,
+            puerpera: situacion.condicion == CondicionGestacional.puerpera,
+            personalSalud: situacion.personalSalud,
+          );
         } catch (e) {
           if (!mounted) break;
           // Cerrar el dialog de loading antes de mostrar el error.
@@ -492,10 +487,66 @@ class _EscanerDniState extends State<EscanerDni> {
     return a.isEmpty ? null : a;
   }
 
-  Future<void> obtenerDatosBeneficiario(String? dni) async {
+  /// Diálogo previo a la consulta: pide la situación del beneficiario
+  /// (condición gestacional excluyente + personal de salud) para poder
+  /// enviarla en la misma llamada a `wserv_obtener_datos_persona.php`.
+  /// Devuelve `null` si el usuario cancela.
+  Future<({CondicionGestacional? condicion, bool personalSalud})?>
+      _pedirSituacionBeneficiario() {
+    CondicionGestacional? condicion;
+    var personalSalud = false;
+    return showDialog<({CondicionGestacional? condicion, bool personalSalud})>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setStateDialog) => DialogoAlerta(
+          tituloAlerta: 'Situación',
+          contenido: SingleChildScrollView(
+            child: SituacionBeneficiario(
+              sexoEsFemenino: sexoPersona == 'F',
+              condicion: condicion,
+              esPersonalDeSalud: personalSalud,
+              onCondicionChanged: (c) => setStateDialog(() => condicion = c),
+              onPersonalSaludChanged: (v) =>
+                  setStateDialog(() => personalSalud = v),
+            ),
+          ),
+          dosBotones: true,
+          textoBotonAlerta: 'Continuar',
+          textoBotonAlerta2: 'Cancelar',
+          funcion1: () => Navigator.of(dialogContext).pop((
+            condicion: condicion,
+            personalSalud: personalSalud,
+          )),
+          funcion2: () => Navigator.of(dialogContext).pop(),
+        ),
+      ),
+    );
+  }
+
+  Future<void> obtenerDatosBeneficiario(
+    String? dni, {
+    required bool embarazada,
+    required bool puerpera,
+    required bool personalSalud,
+  }) async {
     try {
-      final datosBeneficiario = await beneficiarioProviders
-          .obtenerDatosBeneficiario(codigodebarras, dni, sexoPersona);
+      situacionBeneficiarioService.cargarSituacion(
+        condicionGestacional: embarazada
+            ? CondicionGestacional.embarazada
+            : puerpera
+                ? CondicionGestacional.puerpera
+                : null,
+        esPersonalDeSalud: personalSalud,
+      );
+      final datosBeneficiario = await beneficiarioProviders.obtenerDatosPersona(
+        codigodebarras,
+        dni,
+        sexoPersona,
+        embarazada: embarazada,
+        puerpera: puerpera,
+        personalSalud: personalSalud,
+      );
       final b0 = datosBeneficiario[0];
       if (b0.codigo_mensaje == '0') {
         loadingLoginService.cargarEstado(false);
@@ -530,9 +581,15 @@ class _EscanerDniState extends State<EscanerDni> {
         );
       });
 
-      final notificaciones =
-          await sistemaRepository.validarNotificaciones(dni, sexoPersona);
-      notificaciones[0].codigo_mensaje == '1'
+      final notificaciones = await sistemaRepository.validarNotificaciones(
+        dni,
+        sexoPersona,
+        embarazada: embarazada,
+        puerpera: puerpera,
+        personalSalud: personalSalud,
+        edadDias: beneficiarioService.diasDeVidaBeneficiario,
+      );
+      notificaciones.isNotEmpty
           ? {
               notificacionesDosisService.cargarListaDosis(notificaciones),
             }
@@ -573,7 +630,7 @@ class _EscanerDniState extends State<EscanerDni> {
         apellidoPersona = datos.apellido;
         nombrePersona = datos.nombre;
         dniPersona = datos.dni;
-        sexoPersona = _normalizarSexoPdf417(datos.sexo);
+        sexoPersona = datos.sexo;
         numeroTramite = datos.tramite;
         codigodebarras = cadenaApi;
         _fechaNacPdf417Escaneo = datos.fechaNacimientoPdf417;
@@ -621,12 +678,13 @@ _DatosDniPdf417? _parsearPdf417DniArgentino(List<String> p) {
   // Formato anterior: PDF417 del reverso (16 o 17 campos con @).
   if (n == 17 || n == 16) {
     final dni = p[1].replaceAll(RegExp(r'\s'), '');
-    if (_kRegexDni.hasMatch(dni)) {
+    final sx = _normalizarSexoPdf417(p[8]);
+    if (_kRegexDni.hasMatch(dni) && sx != null) {
       return _DatosDniPdf417(
         apellido: p[4],
         nombre: p[5],
         dni: dni,
-        sexo: _normalizarSexoPdf417(p[8]),
+        sexo: sx,
         tramite: p[10],
         fechaNacimientoPdf417: fn,
       );
@@ -645,13 +703,13 @@ _DatosDniPdf417? _parsearPdf417DniArgentino(List<String> p) {
 
   if (n >= 5) {
     final dni = p[4].replaceAll(RegExp(r'\s'), '');
-    final sx = p[3].trim();
-    if (_kRegexDni.hasMatch(dni) && _kRegexSexo.hasMatch(sx)) {
+    final sx = _normalizarSexoPdf417(p[3]);
+    if (_kRegexDni.hasMatch(dni) && sx != null) {
       return _DatosDniPdf417(
         apellido: p[1],
         nombre: p[2],
         dni: dni,
-        sexo: sx.toUpperCase().startsWith('M') ? 'M' : 'F',
+        sexo: sx,
         tramite: p[0],
         fechaNacimientoPdf417: fn,
       );
@@ -671,11 +729,14 @@ _DatosDniPdf417? _parsearPdf417DniArgentino(List<String> p) {
 }
 
 /// M / F / X (género no binario, habilitado por Renaper desde 2021).
-String _normalizarSexoPdf417(String raw) {
+/// Devuelve `null` si [raw] no es un valor de sexo reconocible — el caller
+/// debe tratarlo como fallo de parseo, nunca asumir un sexo por default.
+String? _normalizarSexoPdf417(String raw) {
   final u = raw.trim().toUpperCase();
   if (u == 'M' || u == 'MASCULINO') return 'M';
   if (u == 'X') return 'X';
-  return 'F';
+  if (u == 'F' || u == 'FEMENINO') return 'F';
+  return null;
 }
 
 _DatosDniPdf417? _parseoHeuristicoPdf417(List<String> p) {
@@ -702,21 +763,14 @@ _DatosDniPdf417? _parseoHeuristicoPdf417(List<String> p) {
   }
   if (dni == null) return null;
 
-  var sexo = 'F';
+  String? sexo;
   for (final s in p) {
-    final u = s.trim().toUpperCase();
-    if (u == 'M' || u == 'MASCULINO') { sexo = 'M'; break; }
-    if (u == 'X')                      { sexo = 'X'; break; }
-    if (u == 'F' || u == 'FEMENINO')   { sexo = 'F'; break; }
+    sexo = _normalizarSexoPdf417(s.trim());
+    if (sexo != null) break;
   }
-  if (sexo == 'F') {
-    for (final s in p) {
-      if (_kRegexSexo.hasMatch(s.trim())) {
-        sexo = _normalizarSexoPdf417(s.trim());
-        break;
-      }
-    }
-  }
+  // Ningún campo tiene un valor de sexo reconocible: parseo no confiable,
+  // no asumir "F" por default.
+  if (sexo == null) return null;
 
   final textos = <String>[];
   for (var i = 0; i < p.length; i++) {
@@ -774,10 +828,14 @@ class _ScannerPage extends StatefulWidget {
   State<_ScannerPage> createState() => _ScannerPageState();
 }
 
-/// Toda el área útil del fotograma para no cortar PDF417 ni códigos largos.
-const double _kCropDecodificacionPdf417 = 1.0;
+/// 90% del ancho: cropPercent=1.0 recorta un cuadrado centrado de lado
+/// min(ancho, alto) (ver flutter_zxing reader_widget.dart), NO el fotograma
+/// completo — en cámara portrait eso descarta buena parte de la imagen
+/// arriba/abajo. PDF417 es horizontal y ancho, necesita área generosa pero
+/// no conviene bajar de 0.7.
+const double _kCropDecodificacionPdf417 = 0.9;
 
-/// Marco visual: guía; la decodificación usa todo el encuadre.
+/// Marco visual: guía dentro del área real de decodificación.
 const double _kMarcoGuiaVisualPdf417 = 0.78;
 
 class _ScannerPageState extends State<_ScannerPage> {
@@ -949,7 +1007,7 @@ class _ScannerPageState extends State<_ScannerPage> {
       _avisarCodigoNoEsDni();
       return;
     }
-    final sx = _normalizarSexoPdf417(datos.sexo);
+    final sx = datos.sexo;
     final etiquetaSexo = sx == 'M' ? 'Masculino' : sx == 'X' ? 'No binario (X)' : 'Femenino';
     setState(() {
       _panelConfirmacionVisible = true;
@@ -1025,8 +1083,9 @@ class _ScannerPageState extends State<_ScannerPage> {
             // PDF417 impreso en DNI moderno es legible sin estrategias extra.
             tryHarder: false,
             tryDownscale: true,
-            // Algunos PDF417 del DNI se leen mejor con variante invertida.
-            tryInverted: true,
+            // Innecesario para DNI argentino (siempre fondo claro) y duplica
+            // el costo de decodificación por frame (decodifica dos veces).
+            tryInverted: false,
             showToggleCamera: false,
             showGallery: false,
             loading: const _CamaraCargando(),
@@ -1036,26 +1095,17 @@ class _ScannerPageState extends State<_ScannerPage> {
                   if (!mounted) return;
                   await showDialog<void>(
                     context: context,
-                    builder: (ctx) => AlertDialog(
-                      title: Text(
-                        'No se pudo abrir la cámara',
-                        style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.w700,
-                            ),
+                    builder: (ctx) => DialogoAlerta(
+                      tituloAlerta: 'No se pudo abrir la cámara',
+                      descripcionAlerta:
+                          'Comprobá permisos y que otra app no esté usando la cámara.\n\n$err',
+                      icon: Icon(
+                        Icons.videocam_off_rounded,
+                        size: AppTamanoIcono.grande,
                       ),
-                      content: Text(
-                        'Comprobá permisos y que otra app no esté usando la cámara.\n\n$err',
-                        style: Theme.of(ctx).textTheme.bodyMedium?.copyWith(
-                              height: 1.35,
-                            ),
-                      ),
-                      actions: [
-                        TextButton(
-                          style: AppBotones.estiloTexto(Theme.of(ctx).colorScheme),
-                          onPressed: () => Navigator.of(ctx).pop(),
-                          child: const Text('Cerrar'),
-                        ),
-                      ],
+                      color: Theme.of(ctx).colorScheme.error,
+                      envioFuncion1: false,
+                      textoBotonAlerta: 'Cerrar',
                     ),
                   );
                   if (mounted) Navigator.of(context).pop(null);

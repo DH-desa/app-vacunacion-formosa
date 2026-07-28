@@ -36,7 +36,13 @@
       "Bash(open /Users/emilianocaceres/Desktop/UPSTI/app-vacunacion-formosa/ios/Runner.xcworkspace)",
       "Bash(git add *)",
       "Bash(git commit -m ' *)",
-      "Bash(grep -iv \"non_constant_identifier_names\\\\|unused_local_variable\\\\|Analyzing\\\\|issues found\\\\|^$\")"
+      "Bash(grep -iv \"non_constant_identifier_names\\\\|unused_local_variable\\\\|Analyzing\\\\|issues found\\\\|^$\")",
+      "Bash(curl -s -o /dev/null -w \"HTTP %{http_code}\\\\n\" --max-time 10 \"https://dh.formosa.gob.ar/modulos/webservice/php/version_5_0/wserv_obtener_datos_persona.php?sysdesa10_dni=12345678&sysdesa10_sexo=F\")",
+      "Bash(curl -s -o /dev/null -w \"HTTP %{http_code}\\\\n\" --max-time 10 \"https://dh.formosa.gob.ar/modulos/webservice/php/version_3_0/wserv_obtener_datos_beneficiario.php?sysdesa10_dni=12345678&sysdesa10_sexo=F\")",
+      "Read(//Users/emilianocaceres/Desktop/DH/web-admin-vacunacion/src/**)",
+      "Bash(find / -maxdepth 6 -iname \"dh\" -type d)",
+      "Bash(find / -maxdepth 6 -iname \"web-admin-vacunacion*\")",
+      "Read(//Users/emilianocaceres/**)"
     ]
   }
 }

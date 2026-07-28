@@ -9,6 +9,7 @@ import 'package:sistema_vacunacion/src/domain/entities/vacunados/cantidadvacunad
 import 'package:sistema_vacunacion/src/data/datasources/providers.dart';
 import 'package:sistema_vacunacion/src/data/repositories/repositories.dart';
 import 'package:sistema_vacunacion/src/presentation/state/services.dart';
+import 'package:sistema_vacunacion/src/utils/edad_beneficiario.dart';
 import 'package:sistema_vacunacion/src/widgets/widgets.dart';
 
 import '../pages.dart';
@@ -32,8 +33,6 @@ class _BusquedaBeneficiarioState extends State<BusquedaBeneficiario> {
   /// Escaneo: true cuando el beneficiario ya fue cargado por [EscanerDni]
   /// y la tarjeta pasa a mostrar sexo detectado + situación + continuar.
   bool _beneficiarioEscaneado = false;
-  CondicionGestacional? _condicionEscaneo;
-  bool _personalSaludEscaneo = false;
 
   @override
   void initState() {
@@ -200,8 +199,9 @@ class _BusquedaBeneficiarioState extends State<BusquedaBeneficiario> {
     );
   }
 
-  /// Modo escaneo: botón de cámara; tras cargar el beneficiario muestra el
-  /// sexo detectado, las selecciones de situación y el botón continuar.
+  /// Modo escaneo: botón de cámara; tras cargar el beneficiario (con la
+  /// situación ya pedida y enviada por [EscanerDni] antes de la consulta)
+  /// muestra el resumen escaneado y el botón continuar.
   Widget _modoEscaneo(BuildContext context) {
     final b = beneficiarioService.beneficiario;
     final sexo = b?.sysdesa10_sexo;
@@ -228,15 +228,6 @@ class _BusquedaBeneficiarioState extends State<BusquedaBeneficiario> {
         if (_beneficiarioEscaneado && b != null) ...[
           const SizedBox(height: AppEspaciado.lg),
           _resumenEscaneado(context, b, etiquetaSexo),
-          const SizedBox(height: AppEspaciado.lg),
-          SituacionBeneficiario(
-            sexoEsFemenino: sexo == 'F',
-            condicion: _condicionEscaneo,
-            esPersonalDeSalud: _personalSaludEscaneo,
-            onCondicionChanged: (c) => setState(() => _condicionEscaneo = c),
-            onPersonalSaludChanged: (v) =>
-                setState(() => _personalSaludEscaneo = v),
-          ),
           const SizedBox(height: AppEspaciado.lg),
           FilledButton.icon(
             style: AppBotones.estiloFilledIconCta(
@@ -312,16 +303,10 @@ class _BusquedaBeneficiarioState extends State<BusquedaBeneficiario> {
   void _alCargarBeneficiarioEscaneado() {
     setState(() {
       _beneficiarioEscaneado = true;
-      _condicionEscaneo = null;
-      _personalSaludEscaneo = false;
     });
   }
 
   void _continuarEscaneado() {
-    situacionBeneficiarioService.cargarSituacion(
-      condicionGestacional: _condicionEscaneo,
-      esPersonalDeSalud: _personalSaludEscaneo,
-    );
     Navigator.pushAndRemoveUntil(
       context,
       MaterialPageRoute(builder: (context) => const VacunasPage()),
@@ -378,17 +363,35 @@ class _BusquedaBeneficiarioState extends State<BusquedaBeneficiario> {
     String? sexoPersona,
   ) async {
     try {
-      final datosBeneficiario = await beneficiarioProviders
-          .obtenerDatosBeneficiario('', dni, sexoPersona);
+      final condicion = situacionBeneficiarioService.condicionGestacional;
+      final datosBeneficiario = await beneficiarioProviders.obtenerDatosPersona(
+        '',
+        dni,
+        sexoPersona,
+        embarazada: condicion == CondicionGestacional.embarazada,
+        puerpera: condicion == CondicionGestacional.puerpera,
+        personalSalud: situacionBeneficiarioService.esPersonalDeSalud,
+      );
+      final nacimiento = parseFechaNacimiento(
+        datosBeneficiario.isNotEmpty
+            ? datosBeneficiario[0].sysdesa10_fecha_nacimiento
+            : null,
+      );
       final notificaciones = await sistemaRepository.validarNotificaciones(
         dni,
         sexoPersona,
+        embarazada: condicion == CondicionGestacional.embarazada,
+        puerpera: condicion == CondicionGestacional.puerpera,
+        personalSalud: situacionBeneficiarioService.esPersonalDeSalud,
+        edadDias: nacimiento == null
+            ? null
+            : diasDeVidaDesde(nacimiento, DateTime.now()).toString(),
       );
       if (!mounted) return;
 
       _cerrarDialogoCargaSiAbierta();
 
-      if (notificaciones[0].codigo_mensaje == '1') {
+      if (notificaciones.isNotEmpty) {
         notificacionesDosisService.cargarListaDosis(notificaciones);
       } else {
         notificacionesDosisService.cargarRegistro(NotificacionesDosis());
@@ -462,15 +465,7 @@ class _BusquedaBeneficiarioState extends State<BusquedaBeneficiario> {
     if (loading) {
       showDialog(
         context: context,
-        builder: (context) {
-          return AlertDialog(
-            title: Text(
-              mensaje,
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            content: const LinearProgressIndicator(),
-          );
-        },
+        builder: (context) => LoadingDialogEstrellas(mensaje: mensaje),
       );
     }
   }

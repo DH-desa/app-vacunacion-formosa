@@ -277,26 +277,25 @@ class _LoginBodyState extends State<LoginBody> {
   void mostrarAlertaActualizacion(BuildContext context, String mensaje) {
     showDialog<void>(
       context: context,
-      builder: (BuildContext ctx) {
-        final cs = Theme.of(ctx).colorScheme;
-        return AlertDialog(
-          title: const Text('Actualización disponible'),
-          content: Text(mensaje),
-          actions: <Widget>[
-            if (!Platform.isIOS)
-              TextButton(
-                style: AppBotones.estiloTexto(cs),
-                child: const Text('Descargar APK'),
-                onPressed: _launchURL,
-              ),
-            TextButton(
-              style: AppBotones.estiloTexto(cs),
-              child: const Text('Cerrar'),
-              onPressed: () => Navigator.of(ctx).pop(),
-            ),
-          ],
-        );
-      },
+      builder: (BuildContext ctx) => DialogoAlerta(
+        tituloAlerta: 'Actualización disponible',
+        descripcionAlerta: mensaje,
+        icon: Icon(
+          Icons.system_update_alt_rounded,
+          size: AppTamanoIcono.grande,
+        ),
+        color: Theme.of(ctx).colorScheme.primary,
+        dosBotones: !Platform.isIOS,
+        textoBotonAlerta: 'Cerrar',
+        textoBotonAlerta2: 'Descargar APK',
+        envioFuncion1: false,
+        funcion2: !Platform.isIOS
+            ? () {
+                Navigator.of(ctx).pop();
+                _launchURL();
+              }
+            : null,
+      ),
     );
   }
 

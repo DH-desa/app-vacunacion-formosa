@@ -34,6 +34,7 @@ class CustomInput extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
+      clipBehavior: Clip.antiAlias,
       padding: const EdgeInsets.only(
         top: AppEspaciado.xs,
         left: AppEspaciado.xs,
