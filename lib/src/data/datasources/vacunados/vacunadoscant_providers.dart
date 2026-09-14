@@ -1,8 +1,8 @@
 import 'dart:convert';
 import 'package:sistema_vacunacion/src/utils/encoding_utils.dart';
 
-import 'package:http/http.dart' as http;
 import 'package:sistema_vacunacion/src/config/config.dart';
+import 'package:sistema_vacunacion/src/core/debug/dev_log_service.dart';
 
 import 'package:sistema_vacunacion/src/domain/entities/models.dart';
 import 'package:sistema_vacunacion/src/presentation/state/services.dart';
@@ -10,7 +10,8 @@ import 'package:sistema_vacunacion/src/presentation/state/services.dart';
 class _CantidadVacunadosFecha {
   Future<List<CantidadVacunados>> procesarRespuestaDos(Uri url) async {
     try {
-      final resp = await http.get(url);
+      final resp = await devHttpGet('cant_vacunados', url,
+          timeout: const Duration(seconds: 30));
       if (resp.statusCode == 200) {
         final decodedData = json.decode(decodificarRespuestaHTTP(resp.bodyBytes));
         final cantidadVacunas =
@@ -25,15 +26,16 @@ class _CantidadVacunadosFecha {
   }
 
   Future cantidadVacunas() async {
-    if (vacunadorService.existeVacunador != false) {
+    final vacunador = vacunadorService.vacunador;
+    final registrador = registradorService.registrador;
+    if (vacunadorService.existeVacunador != false &&
+        vacunador != null &&
+        registrador != null) {
       final url =
           Uri(scheme: scheme, host: host, path: urlCantVacu, queryParameters: {
-        'id_sysdesa12': vacunadorService.vacunador!.id_sysdesa12,
+        'id_sysdesa12': vacunador.id_sysdesa12,
         'vacunador_registrador':
-            registradorService.registrador!.flxcore03_dni ==
-                    vacunadorService.vacunador!.id_sysdesa12
-                ? '1'
-                : '0',
+            registrador.flxcore03_dni == vacunador.id_sysdesa12 ? '1' : '0',
       });
 
       final List<CantidadVacunados> resp = await procesarRespuestaDos(url);

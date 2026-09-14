@@ -21,6 +21,7 @@ class SituacionBeneficiario extends StatelessWidget {
     required this.esPersonalDeSalud,
     required this.onCondicionChanged,
     required this.onPersonalSaludChanged,
+    this.personalSaludEditable = true,
   });
 
   /// Habilita el bloque de condición gestacional. Si es `false`, no se muestra.
@@ -36,20 +37,24 @@ class SituacionBeneficiario extends StatelessWidget {
 
   final ValueChanged<bool> onPersonalSaludChanged;
 
+  /// `false` = solo lectura (switch deshabilitado). Usado en el sheet de
+  /// detalle de `VacunasPage`, donde el dato ya quedó fijado al ingresar
+  /// al beneficiario y no debe poder tocarse de nuevo ahí.
+  final bool personalSaludEditable;
+
   static const Color _colorEmbarazada = SisVacuMarca.azulFormosa;
   static const Color _colorPuerpera = SisVacuMarca.vercelestePrimario;
 
   @override
   Widget build(BuildContext context) {
-    final tt = Theme.of(context).textTheme;
+    final bar = context.sisTipografia;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
           'Situación',
-          style: tt.labelLarge?.copyWith(
-            fontSize: 12,
+          style: bar.textoChip.copyWith(
             fontWeight: FontWeight.w700,
             letterSpacing: 0.2,
             color: AppSuperficies.textoSecundario(context),
@@ -73,14 +78,13 @@ class SituacionBeneficiario extends StatelessWidget {
   }
 
   Widget _bloqueCondicion(BuildContext context) {
-    final tt = Theme.of(context).textTheme;
+    final bar = context.sisTipografia;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
           'Condición',
-          style: tt.bodyMedium?.copyWith(
-            fontSize: 13,
+          style: bar.textoSecundario.copyWith(
             fontWeight: FontWeight.w600,
             color: AppSuperficies.textoSecundario(context),
           ),
@@ -129,7 +133,7 @@ class SituacionBeneficiario extends StatelessWidget {
     required VoidCallback onTap,
   }) {
     final cs = Theme.of(context).colorScheme;
-    final tt = Theme.of(context).textTheme;
+    final bar = context.sisTipografia;
     return Expanded(
       child: Material(
         color: seleccionado
@@ -161,8 +165,7 @@ class SituacionBeneficiario extends StatelessWidget {
                 const SizedBox(height: AppEspaciado.xs),
                 Text(
                   etiqueta,
-                  style: tt.titleSmall?.copyWith(
-                    fontSize: 14,
+                  style: bar.textoPrincipal.copyWith(
                     fontWeight: seleccionado ? FontWeight.w800 : FontWeight.w600,
                     color: seleccionado ? colorAcento : cs.onSurfaceVariant,
                   ),
@@ -177,7 +180,7 @@ class SituacionBeneficiario extends StatelessWidget {
 
   Widget _filaPersonalSalud(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final tt = Theme.of(context).textTheme;
+    final bar = context.sisTipografia;
     return Row(
       children: [
         Expanded(
@@ -186,24 +189,24 @@ class SituacionBeneficiario extends StatelessWidget {
             children: [
               Text(
                 'Personal de salud',
-                style: tt.titleSmall?.copyWith(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
+                style: bar.textoDestacado.copyWith(
                   color: cs.onSurface,
                 ),
               ),
               const SizedBox(height: AppEspaciado.xs),
               Text(
                 'Trabaja en el sistema de salud.',
-                style: tt.bodyMedium?.copyWith(
-                  fontSize: 13,
+                style: bar.textoSecundario.copyWith(
                   color: AppSuperficies.textoSecundario(context),
                 ),
               ),
             ],
           ),
         ),
-        Switch(value: esPersonalDeSalud, onChanged: onPersonalSaludChanged),
+        Switch(
+          value: esPersonalDeSalud,
+          onChanged: personalSaludEditable ? onPersonalSaludChanged : null,
+        ),
       ],
     );
   }

@@ -61,8 +61,8 @@ class _UsuariosProviders {
 
   Future validarUsuariosNuevo(String? dni) async {
     final url = Uri(
-        scheme: 'https',
-        host: 'dh.formosa.gob.ar',
+        scheme: scheme,
+        host: host,
         path: '/modulos/webservice/php/version_2_0/wserv_login.php',
         queryParameters: {
           'flxcore03_dni': dni,

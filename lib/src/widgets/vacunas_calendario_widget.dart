@@ -16,7 +16,6 @@ class VacunasCalendarioFiltradas extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final tt = Theme.of(context).textTheme;
     final bar = context.sisTipografia;
     final grupos = vacunasPorFilas(resultado.filas);
 
@@ -37,8 +36,7 @@ class VacunasCalendarioFiltradas extends StatelessWidget {
           const SizedBox(height: AppEspaciado.xs),
           Text(
             'Según edad y situación del beneficiario',
-            style: tt.labelLarge?.copyWith(
-              fontSize: 12,
+            style: bar.textoChip.copyWith(
               fontWeight: FontWeight.w700,
               letterSpacing: 0.8,
               color: cs.onSurfaceVariant,
@@ -48,8 +46,7 @@ class VacunasCalendarioFiltradas extends StatelessWidget {
           if (grupos.isEmpty)
             Text(
               'Edad no determinada: no se pudo filtrar el calendario.',
-              style: tt.bodyMedium?.copyWith(
-                fontSize: 13,
+              style: bar.textoSecundario.copyWith(
                 color: AppSuperficies.textoSecundario(context),
               ),
             )
@@ -65,15 +62,14 @@ class VacunasCalendarioFiltradas extends StatelessWidget {
 
   Widget _bloqueFila(BuildContext context, VacunasPorFila grupo) {
     final cs = Theme.of(context).colorScheme;
-    final tt = Theme.of(context).textTheme;
+    final bar = context.sisTipografia;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
           grupo.fila.etiqueta,
-          style: tt.titleSmall?.copyWith(
-            fontSize: 13,
+          style: bar.textoSecundario.copyWith(
             fontWeight: FontWeight.w800,
             color: cs.primary,
           ),
@@ -82,8 +78,8 @@ class VacunasCalendarioFiltradas extends StatelessWidget {
         if (grupo.vacunas.isEmpty)
           Text(
             'Sin vacunas cargadas para esta fila.',
-            style: tt.bodySmall?.copyWith(
-              fontSize: 12,
+            style: bar.textoChip.copyWith(
+              fontWeight: FontWeight.w400,
               color: AppSuperficies.textoSecundario(context),
             ),
           )
@@ -95,7 +91,7 @@ class VacunasCalendarioFiltradas extends StatelessWidget {
 
   Widget _filaVacuna(BuildContext context, VacunaFilaCalendario v) {
     final cs = Theme.of(context).colorScheme;
-    final tt = Theme.of(context).textTheme;
+    final bar = context.sisTipografia;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: AppEspaciado.xs),
@@ -111,8 +107,7 @@ class VacunasCalendarioFiltradas extends StatelessWidget {
           Expanded(
             child: RichText(
               text: TextSpan(
-                style: tt.bodyMedium?.copyWith(
-                  fontSize: 13.5,
+                style: bar.textoPrincipal.copyWith(
                   height: 1.35,
                   color: cs.onSurface,
                 ),

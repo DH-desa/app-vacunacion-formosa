@@ -51,20 +51,23 @@ class VacunasCondicion {
   }
 
   Map<String, dynamic> toJson() => {
-        "id_sysvacu01": id_sysvacu01,
-        "sysvacu01_codigo": sysvacu01_codigo,
-        "sysvacu01_descripcion": sysvacu01_descripcion,
-        "sysvacu01_orden": sysvacu01_orden,
-        "sysvacu01_abreviatura": sysvacu01_abreviatura,
-        "codigo_mensaje": codigo_mensaje,
-        "mensaje": mensaje,
-      };
+    "id_sysvacu01": id_sysvacu01,
+    "sysvacu01_codigo": sysvacu01_codigo,
+    "sysvacu01_descripcion": sysvacu01_descripcion,
+    "sysvacu01_orden": sysvacu01_orden,
+    "sysvacu01_abreviatura": sysvacu01_abreviatura,
+    "codigo_mensaje": codigo_mensaje,
+    "mensaje": mensaje,
+  };
 
   VacunasCondicion.fromJsonList(List<dynamic>? jsonList) {
     if (jsonList == null) return;
 
-    for (var item in jsonList) {
-      final vacunasCondiciones = VacunasCondicion.fromJsonMap(item);
+    for (final item in jsonList) {
+      if (item is! Map) continue;
+      final vacunasCondiciones = VacunasCondicion.fromJsonMap(
+        Map<String, dynamic>.from(item),
+      );
       items.add(vacunasCondiciones);
     }
   }

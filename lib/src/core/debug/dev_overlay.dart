@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'package:sistema_vacunacion/src/config/config.dart';
 import 'package:sistema_vacunacion/src/core/debug/dev_log_service.dart';
 import 'package:sistema_vacunacion/src/presentation/state/services.dart';
 
@@ -158,9 +159,12 @@ class _DevPanel extends StatelessWidget {
                 const Icon(Icons.bug_report,
                     color: Colors.deepPurple, size: 16),
                 const SizedBox(width: 8),
-                const Text('DEV Panel',
-                    style: TextStyle(
-                        fontWeight: FontWeight.bold, fontSize: 14)),
+                Text(
+                  'DEV Panel',
+                  style: context.sisTipografia.textoPrincipal.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
                 const Spacer(),
                 GestureDetector(
                   onTap: onCerrar,
@@ -169,9 +173,11 @@ class _DevPanel extends StatelessWidget {
               ],
             ),
           ),
-          const TabBar(
-            labelStyle: TextStyle(fontSize: 12),
-            tabs: [
+          TabBar(
+            labelStyle: context.sisTipografia.textoChip.copyWith(
+              fontWeight: FontWeight.w400,
+            ),
+            tabs: const [
               Tab(text: 'Sesión'),
               Tab(text: 'API Logs'),
               Tab(text: 'Registro JSON'),
@@ -348,9 +354,12 @@ class _Seccion extends StatelessWidget {
               children: [
                 Icon(icono, size: 14, color: Colors.deepPurple),
                 const SizedBox(width: 6),
-                Text(titulo,
-                    style: const TextStyle(
-                        fontWeight: FontWeight.bold, fontSize: 12)),
+                Text(
+                  titulo,
+                  style: context.sisTipografia.textoChip.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
               ],
             ),
             const Divider(height: 10),
@@ -376,14 +385,24 @@ class _Fila extends StatelessWidget {
         children: [
           SizedBox(
             width: 110,
-            child: Text(etiqueta,
-                style:
-                    const TextStyle(fontSize: 11, color: Colors.grey)),
+            child: Text(
+              etiqueta,
+              style: context.sisTipografia.etiquetaSeccion.copyWith(
+                letterSpacing: 0,
+                fontWeight: FontWeight.w400,
+                color: Colors.grey,
+              ),
+            ),
           ),
           Expanded(
-            child: Text(valor,
-                style: const TextStyle(fontSize: 11),
-                overflow: TextOverflow.ellipsis),
+            child: Text(
+              valor,
+              style: context.sisTipografia.etiquetaSeccion.copyWith(
+                letterSpacing: 0,
+                fontWeight: FontWeight.w400,
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
         ],
       ),
@@ -412,24 +431,38 @@ class _TabApiLogs extends StatelessWidget {
                   const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
               child: Row(
                 children: [
-                  Text('${logs.length} entradas',
-                      style: const TextStyle(
-                          fontSize: 11, color: Colors.grey)),
+                  Text(
+                    '${logs.length} entradas',
+                    style: context.sisTipografia.etiquetaSeccion.copyWith(
+                      letterSpacing: 0,
+                      fontWeight: FontWeight.w400,
+                      color: Colors.grey,
+                    ),
+                  ),
                   const Spacer(),
                   TextButton(
                     onPressed: devLogService.limpiar,
-                    child: const Text('Limpiar',
-                        style: TextStyle(fontSize: 11)),
+                    child: Text(
+                      'Limpiar',
+                      style: context.sisTipografia.etiquetaSeccion.copyWith(
+                        letterSpacing: 0,
+                        fontWeight: FontWeight.w400,
+                      ),
+                    ),
                   ),
                 ],
               ),
             ),
             Expanded(
               child: logs.isEmpty
-                  ? const Center(
-                      child: Text('Sin logs aún.',
-                          style: TextStyle(
-                              color: Colors.grey, fontSize: 13)))
+                  ? Center(
+                      child: Text(
+                        'Sin logs aún.',
+                        style: context.sisTipografia.textoSecundario.copyWith(
+                          color: Colors.grey,
+                        ),
+                      ),
+                    )
                   : ListView.separated(
                       padding:
                           const EdgeInsets.symmetric(horizontal: 8),
@@ -468,6 +501,7 @@ class _LogTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final bar = context.sisTipografia;
     final color = _colores[entry.tipo] ?? Colors.grey;
     final icono = _iconos[entry.tipo] ?? Icons.info_outline;
     final hora =
@@ -479,12 +513,22 @@ class _LogTile extends StatelessWidget {
       childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
       title: Text(
         '[${entry.tag}] ${entry.mensaje}',
-        style: TextStyle(fontSize: 11, color: color),
+        style: bar.etiquetaSeccion.copyWith(
+          letterSpacing: 0,
+          fontWeight: FontWeight.w400,
+          color: color,
+        ),
         maxLines: 2,
         overflow: TextOverflow.ellipsis,
       ),
-      subtitle: Text(hora,
-          style: const TextStyle(fontSize: 10, color: Colors.grey)),
+      subtitle: Text(
+        hora,
+        style: bar.etiquetaSeccion.copyWith(
+          letterSpacing: 0,
+          fontWeight: FontWeight.w400,
+          color: Colors.grey,
+        ),
+      ),
       children: entry.datos == null
           ? const []
           : [
@@ -497,8 +541,10 @@ class _LogTile extends StatelessWidget {
                 ),
                 child: SelectableText(
                   const JsonEncoder.withIndent('  ').convert(entry.datos),
-                  style: const TextStyle(
-                      fontFamily: 'monospace', fontSize: 10),
+                  style: bar.etiquetaSeccion.copyWith(
+                    letterSpacing: 0,
+                    fontFamily: 'monospace',
+                  ),
                 ),
               ),
             ],
@@ -533,15 +579,16 @@ class _TabRegistroJsonState extends State<_TabRegistroJson> {
 
   @override
   Widget build(BuildContext context) {
+    final bar = context.sisTipografia;
     final reg = insertRegistroService.registro;
     if (reg == null) {
-      return const Center(
+      return Center(
         child: Padding(
-          padding: EdgeInsets.all(24),
+          padding: const EdgeInsets.all(24),
           child: Text(
             'Sin registro en memoria.\nCompletar el formulario de vacunas para verlo aquí.',
             textAlign: TextAlign.center,
-            style: TextStyle(color: Colors.grey),
+            style: bar.textoPrincipal.copyWith(color: Colors.grey),
           ),
         ),
       );
@@ -561,9 +608,12 @@ class _TabRegistroJsonState extends State<_TabRegistroJson> {
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
           child: Row(
             children: [
-              const Text('Payload actual',
-                  style: TextStyle(
-                      fontWeight: FontWeight.bold, fontSize: 12)),
+              Text(
+                'Payload actual',
+                style: bar.textoChip.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
               const Spacer(),
               IconButton(
                 icon: const Icon(Icons.copy, size: 18),
@@ -595,8 +645,11 @@ class _TabRegistroJsonState extends State<_TabRegistroJson> {
               ),
               child: SelectableText(
                 const JsonEncoder.withIndent('  ').convert(jsonVista),
-                style: const TextStyle(
-                    fontFamily: 'monospace', fontSize: 11),
+                style: bar.etiquetaSeccion.copyWith(
+                  letterSpacing: 0,
+                  fontWeight: FontWeight.w400,
+                  fontFamily: 'monospace',
+                ),
               ),
             ),
           ),
@@ -605,3 +658,4 @@ class _TabRegistroJsonState extends State<_TabRegistroJson> {
     );
   }
 }
+

@@ -1,8 +1,8 @@
 import 'package:animate_do/animate_do.dart';
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
-import 'package:responsive_builder/responsive_builder.dart';
 import 'package:sistema_vacunacion/src/config/config.dart';
+import 'package:sistema_vacunacion/src/core/helpers/helpers.dart';
 import 'package:sistema_vacunacion/src/domain/entities/models.dart';
 import 'package:sistema_vacunacion/src/domain/entities/vacunados/cantidadvacunados_models.dart'
     as modelo;
@@ -29,10 +29,6 @@ class _BusquedaBeneficiarioState extends State<BusquedaBeneficiario> {
 
   /// Modo de entrada elegido: 'escaneo' | 'manual'. Uno solo visible por vez.
   String _modo = 'escaneo';
-
-  /// Escaneo: true cuando el beneficiario ya fue cargado por [EscanerDni]
-  /// y la tarjeta pasa a mostrar sexo detectado + situación + continuar.
-  bool _beneficiarioEscaneado = false;
 
   @override
   void initState() {
@@ -62,7 +58,7 @@ class _BusquedaBeneficiarioState extends State<BusquedaBeneficiario> {
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, result) {
-        if (!didPop) onWillPop();
+        if (!didPop) onWillPop(context);
       },
       child: Scaffold(
         backgroundColor: cs.surface,
@@ -104,7 +100,6 @@ class _BusquedaBeneficiarioState extends State<BusquedaBeneficiario> {
   /// D.N.I. o carga manual. Se muestra un solo formulario por vez.
   Widget _tarjetaCaptura(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final tt = Theme.of(context).textTheme;
     final bar = context.sisTipografia;
 
     return Container(
@@ -131,8 +126,7 @@ class _BusquedaBeneficiarioState extends State<BusquedaBeneficiario> {
                     const SizedBox(height: AppEspaciado.xs),
                     Text(
                       'Elegí cómo cargar el documento',
-                      style: tt.labelLarge?.copyWith(
-                        fontSize: 12,
+                      style: bar.textoChip.copyWith(
                         fontWeight: FontWeight.w700,
                         letterSpacing: 0.8,
                         color: cs.onSurfaceVariant,
@@ -152,7 +146,7 @@ class _BusquedaBeneficiarioState extends State<BusquedaBeneficiario> {
                       envioFuncion1: false,
                       tituloAlerta: 'Información',
                       descripcionAlerta:
-                          'Si el beneficiario tiene el D.N.I., use el modo Escanear y enfoque la cámara al código de barras; el sexo se detecta solo y luego completa la situación. Si no lo tiene, use Carga manual e ingrese número, sexo y situación.',
+                          'Si el beneficiario tiene el D.N.I., use el modo Escanear y enfoque la cámara al código de barras; el sexo se detecta solo y luego completa la situación. Si no lo tiene, use Manual e ingrese número, sexo y situación.',
                       textoBotonAlerta: 'Entendido',
                       color: SisVacuMarca.vercelesteCuaternario,
                       icon: const Icon(
@@ -175,12 +169,12 @@ class _BusquedaBeneficiarioState extends State<BusquedaBeneficiario> {
             segments: const [
               ButtonSegment(
                 value: 'escaneo',
-                label: Text('Escanear D.N.I.'),
+                label: Text('Escanear'),
                 icon: Icon(Icons.qr_code_scanner_rounded),
               ),
               ButtonSegment(
                 value: 'manual',
-                label: Text('Carga manual'),
+                label: Text('Manual'),
                 icon: Icon(Icons.keyboard_alt_outlined),
               ),
             ],
@@ -199,119 +193,10 @@ class _BusquedaBeneficiarioState extends State<BusquedaBeneficiario> {
     );
   }
 
-  /// Modo escaneo: botón de cámara; tras cargar el beneficiario (con la
-  /// situación ya pedida y enviada por [EscanerDni] antes de la consulta)
-  /// muestra el resumen escaneado y el botón continuar.
+  /// Modo escaneo: botón de cámara. [EscanerDni] pide la situación, consulta
+  /// y navega directo a VacunasPage al cargar el beneficiario.
   Widget _modoEscaneo(BuildContext context) {
-    final b = beneficiarioService.beneficiario;
-    final sexo = b?.sysdesa10_sexo;
-    // Antes el fallback era "Femenino" incluso con sexo desconocido, mientras
-    // el bloque de condición gestacional (sexoEsFemenino: sexo == 'F') se
-    // ocultaba igual: la etiqueta contradecía lo que mostraba la pantalla.
-    final etiquetaSexo = sexo == 'M'
-        ? 'Masculino'
-        : sexo == 'F'
-            ? 'Femenino'
-            : sexo == 'X'
-                ? 'No binario (X)'
-                : 'Sin dato';
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        EscanerDni(
-          'Beneficiario',
-          _beneficiarioEscaneado ? 'Escanear otro D.N.I.' : 'Escanear documento',
-          anchoValor: 44,
-          onBeneficiarioCargado: _alCargarBeneficiarioEscaneado,
-        ),
-        if (_beneficiarioEscaneado && b != null) ...[
-          const SizedBox(height: AppEspaciado.lg),
-          _resumenEscaneado(context, b, etiquetaSexo),
-          const SizedBox(height: AppEspaciado.lg),
-          FilledButton.icon(
-            style: AppBotones.estiloFilledIconCta(
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppEspaciado.radioCampo,
-                vertical: AppEspaciado.md + AppEspaciado.xs,
-              ),
-            ),
-            onPressed: _continuarEscaneado,
-            icon: const Icon(Icons.arrow_forward_rounded),
-            label: const Text('Continuar'),
-          ),
-        ],
-      ],
-    );
-  }
-
-  /// Datos detectados del escaneo (solo lectura).
-  Widget _resumenEscaneado(
-    BuildContext context,
-    Beneficiario b,
-    String etiquetaSexo,
-  ) {
-    final cs = Theme.of(context).colorScheme;
-    final tt = Theme.of(context).textTheme;
-    final nombre =
-        '${b.sysdesa10_nombre ?? ''} ${b.sysdesa10_apellido ?? ''}'.trim();
-
-    Widget fila(String etiqueta, String valor) => Padding(
-          padding: const EdgeInsets.only(bottom: AppEspaciado.xs),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              SizedBox(
-                width: 72,
-                child: Text(
-                  etiqueta,
-                  style: tt.labelMedium?.copyWith(
-                    color: AppSuperficies.textoSecundario(context),
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-              Expanded(
-                child: Text(
-                  valor,
-                  style: tt.titleSmall?.copyWith(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: cs.onSurface,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        );
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(AppEspaciado.md),
-      decoration: AppSuperficies.campoBusqueda(context),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (nombre.isNotEmpty) fila('Nombre', nombre),
-          fila('D.N.I.', b.sysdesa10_dni ?? ''),
-          fila('Sexo', etiquetaSexo),
-        ],
-      ),
-    );
-  }
-
-  void _alCargarBeneficiarioEscaneado() {
-    setState(() {
-      _beneficiarioEscaneado = true;
-    });
-  }
-
-  void _continuarEscaneado() {
-    Navigator.pushAndRemoveUntil(
-      context,
-      MaterialPageRoute(builder: (context) => const VacunasPage()),
-      (Route<dynamic> route) => false,
-    );
+    return EscanerDni('Beneficiario', 'Escanear documento', anchoValor: 44);
   }
 
   /// Modo manual: D.N.I. + sexo + situación (reactiva al sexo) + verificar.
@@ -328,33 +213,13 @@ class _BusquedaBeneficiarioState extends State<BusquedaBeneficiario> {
     );
   }
 
-  /// Diálogo de confirmación + loading antes de consultar el padrón.
-  /// Conserva el comportamiento previo del botón «Verificar datos».
+  /// El formulario ya mostró D.N.I./sexo/situación antes de este botón: no
+  /// hace falta reconfirmarlos en un diálogo aparte. Va directo a loading +
+  /// consulta (mismo criterio que el escaneo por cámara).
   void _confirmarYBuscar(String dni, String? sexo) {
-    showDialog(
-      context: context,
-      builder: (context) {
-        return DialogoAlerta(
-          tituloAlerta: 'Verificar datos',
-          descripcionAlerta: 'D.N.I.: $dni — Sexo: $sexo',
-          textoBotonAlerta: 'Verificar',
-          textoBotonAlerta2: 'Cancelar',
-          funcion1: () {
-            obtenerDatosBeneficiario(context, dni, sexo);
-            Navigator.of(context).pop();
-            setState(() {
-              loading = true;
-            });
-            retornarLoading(context, 'Espere por favor');
-          },
-          funcion2: () => Navigator.pop(context),
-          envioFuncion1: true,
-          envioFuncion2: true,
-          icon: const FaIcon(FontAwesomeIcons.check, color: Colors.white),
-          color: SisVacuMarca.vercelesteCuaternario,
-        );
-      },
-    );
+    setState(() => loading = true);
+    retornarLoading(context, 'Espere por favor');
+    obtenerDatosBeneficiario(context, dni, sexo);
   }
 
   Future<void> obtenerDatosBeneficiario(
@@ -372,30 +237,40 @@ class _BusquedaBeneficiarioState extends State<BusquedaBeneficiario> {
         puerpera: condicion == CondicionGestacional.puerpera,
         personalSalud: situacionBeneficiarioService.esPersonalDeSalud,
       );
-      final nacimiento = parseFechaNacimiento(
-        datosBeneficiario.isNotEmpty
-            ? datosBeneficiario[0].sysdesa10_fecha_nacimiento
-            : null,
-      );
-      final notificaciones = await sistemaRepository.validarNotificaciones(
-        dni,
-        sexoPersona,
-        embarazada: condicion == CondicionGestacional.embarazada,
-        puerpera: condicion == CondicionGestacional.puerpera,
-        personalSalud: situacionBeneficiarioService.esPersonalDeSalud,
-        edadDias: nacimiento == null
-            ? null
-            : diasDeVidaDesde(nacimiento, DateTime.now()).toString(),
-      );
+      // El historial es información complementaria: si el webservice falla,
+      // no debe bloquear la carga del beneficiario (que ya se obtuvo bien).
+      try {
+        final nacimiento = parseFechaNacimiento(
+          datosBeneficiario.isNotEmpty
+              ? datosBeneficiario[0].sysdesa10_fecha_nacimiento
+              : null,
+        );
+        final notificaciones = await sistemaRepository.validarNotificaciones(
+          dni,
+          sexoPersona,
+          embarazada: condicion == CondicionGestacional.embarazada,
+          puerpera: condicion == CondicionGestacional.puerpera,
+          personalSalud: situacionBeneficiarioService.esPersonalDeSalud,
+          edadDias: nacimiento == null
+              ? null
+              : diasDeVidaDesde(nacimiento, DateTime.now()).toString(),
+        );
+        if (notificaciones.isNotEmpty) {
+          notificacionesDosisService.cargarListaDosis(notificaciones);
+        } else {
+          notificacionesDosisService.cargarRegistro(NotificacionesDosis());
+        }
+      } catch (_) {
+        notificacionesDosisService.cargarRegistro(NotificacionesDosis());
+        // La misma llamada trae "vacunas_pendientes": si falló, la vía
+        // Pendientes no puede confundir esto con "no tiene nada pendiente".
+        vacunasPendientesService.marcarError(
+          'No se pudo consultar las vacunas pendientes. Revise la conexión.',
+        );
+      }
       if (!mounted) return;
 
       _cerrarDialogoCargaSiAbierta();
-
-      if (notificaciones.isNotEmpty) {
-        notificacionesDosisService.cargarListaDosis(notificaciones);
-      } else {
-        notificacionesDosisService.cargarRegistro(NotificacionesDosis());
-      }
 
       if (datosBeneficiario[0].codigo_mensaje == '0') {
         showDialog(
@@ -470,26 +345,6 @@ class _BusquedaBeneficiarioState extends State<BusquedaBeneficiario> {
     }
   }
 
-  Future<bool> onWillPop() async {
-    final mensajeExit = await showDialog(
-      context: context,
-      builder: (context) => DialogoAlerta(
-        envioFuncion2: true,
-        envioFuncion1: true,
-        tituloAlerta: '¿Cerrar sesión?',
-        descripcionAlerta:
-            'Si sale, deberá iniciar sesión otra vez escaneando su documento.',
-        textoBotonAlerta: 'Sí, salir',
-        textoBotonAlerta2: 'No',
-        funcion1: () => Navigator.of(context).pop(true),
-        funcion2: () => Navigator.of(context).pop(false),
-        color: Theme.of(context).colorScheme.error,
-        icon: const Icon(Icons.new_releases_outlined, size: 40),
-      ),
-    );
-    return mensajeExit ?? false;
-  }
-
   Future<void> _incrementoVacunados() async {
     final cantidadVacunas = await vacunasRepository.cantidadVacunas();
     cantidadVacunasService.cargarCantidadVacunados(cantidadVacunas[0]);
@@ -508,7 +363,9 @@ class _CantidadVacunadosState extends State<CantidadVacunados> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final tt = Theme.of(context).textTheme;
+    final bar = context.sisTipografia;
+    final double ladoInsignia =
+        (MediaQuery.sizeOf(context).width * 0.14).clamp(48, 96).toDouble();
 
     return FadeInUp(
       from: 16,
@@ -518,7 +375,7 @@ class _CantidadVacunadosState extends State<CantidadVacunados> {
         padding: const EdgeInsets.all(AppEspaciado.lg),
         decoration: BoxDecoration(
           color: cs.surfaceContainerHigh.withValues(alpha: 0.45),
-borderRadius: BorderRadius.circular(AppEspaciado.radioCampo),
+          borderRadius: BorderRadius.circular(AppEspaciado.radioCampo),
           border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.38)),
         ),
         child: Row(
@@ -529,8 +386,7 @@ borderRadius: BorderRadius.circular(AppEspaciado.radioCampo),
               children: [
                 Text(
                   'Vacunaciones',
-                  style: tt.labelSmall?.copyWith(
-                    fontSize: 11,
+                  style: bar.etiquetaSeccion.copyWith(
                     fontWeight: FontWeight.w800,
                     letterSpacing: 0.9,
                     color: cs.onSurfaceVariant,
@@ -538,8 +394,8 @@ borderRadius: BorderRadius.circular(AppEspaciado.radioCampo),
                 ),
                 Text(
                   'registradas',
-                  style: tt.labelSmall?.copyWith(
-                    fontSize: 11,
+                  style: bar.etiquetaSeccion.copyWith(
+                    letterSpacing: 0,
                     color: cs.onSurfaceVariant.withValues(alpha: 0.85),
                   ),
                 ),
@@ -553,8 +409,8 @@ borderRadius: BorderRadius.circular(AppEspaciado.radioCampo),
               duration: const Duration(milliseconds: 2000),
               child: Container(
                 alignment: Alignment.center,
-                width: MediaQuery.of(context).size.width * 0.14,
-                height: MediaQuery.of(context).size.width * 0.14,
+                width: ladoInsignia,
+                height: ladoInsignia,
                 decoration: BoxDecoration(
                   color: cs.primary.withValues(alpha: 0.2),
                   shape: BoxShape.circle,
@@ -564,12 +420,13 @@ borderRadius: BorderRadius.circular(AppEspaciado.radioCampo),
                   ),
                 ),
                 child: ValueListenableBuilder<modelo.CantidadVacunados?>(
-                  valueListenable: cantidadVacunasService.cantidadVacunadosEstado,
+                  valueListenable:
+                      cantidadVacunasService.cantidadVacunadosEstado,
                   builder: (BuildContext context, cantidadVacunados, _) {
                     if (cantidadVacunados == null) {
                       return SizedBox(
-                        width: 22,
-                        height: 22,
+                        width: AppTamanoIcono.mediano,
+                        height: AppTamanoIcono.mediano,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
                           color: cs.primary,
@@ -578,13 +435,9 @@ borderRadius: BorderRadius.circular(AppEspaciado.radioCampo),
                     }
                     return Text(
                       cantidadVacunados.cantidad_aplicaciones!,
-                      style: tt.titleMedium?.copyWith(
+                      style: bar.subtituloTarjeta.copyWith(
                         color: cs.primary,
                         fontWeight: FontWeight.w800,
-                        fontSize: getValueForScreenType(
-                          context: context,
-                          mobile: 17,
-                        ),
                       ),
                     );
                   },

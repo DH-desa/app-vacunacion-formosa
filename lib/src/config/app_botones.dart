@@ -42,13 +42,13 @@ class AppBotones {
         ),
         iconSize: WidgetStateProperty.all(iconoTamano),
         padding: WidgetStateProperty.all(
-          padding ?? const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          padding ?? EdgeInsets.symmetric(horizontal: AppEspaciado.lg, vertical: AppEspaciado.md),
         ),
       );
 
   static ButtonStyle estiloIconoAyuda(ColorScheme cs) =>
       IconButton.styleFrom(
-        minimumSize: const Size(48, 48),
+        minimumSize: Size(AppTamanoIcono.extraGrande, AppTamanoIcono.extraGrande),
         tapTargetSize: MaterialTapTargetSize.padded,
         foregroundColor: cs.primary,
         backgroundColor: cs.surfaceContainerLow,
@@ -63,8 +63,8 @@ class AppBotones {
 
   static ButtonStyle estiloOutlined(ColorScheme cs) =>
       OutlinedButton.styleFrom(
-        minimumSize: const Size.fromHeight(48),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        minimumSize: Size.fromHeight(AppTamanoIcono.extraGrande),
+        padding: EdgeInsets.symmetric(horizontal: AppEspaciado.lg, vertical: AppEspaciado.md),
         foregroundColor: cs.onSurface,
         side: BorderSide(
           color: cs.outline.withValues(alpha: 0.6),
@@ -85,8 +85,8 @@ class AppBotones {
           color: cs.error.withValues(alpha: 0.5),
           width: 1.5,
         ),
-        minimumSize: const Size.fromHeight(48),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        minimumSize: Size.fromHeight(AppTamanoIcono.extraGrande),
+        padding: EdgeInsets.symmetric(horizontal: AppEspaciado.lg, vertical: AppEspaciado.md),
         shape: forma,
         textStyle: TextStyle(
           fontSize: fontSizeBoton,
@@ -97,8 +97,8 @@ class AppBotones {
 
   static ButtonStyle estiloFilled(ColorScheme cs) =>
       FilledButton.styleFrom(
-        minimumSize: const Size.fromHeight(48),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        minimumSize: Size.fromHeight(AppTamanoIcono.extraGrande),
+        padding: EdgeInsets.symmetric(horizontal: AppEspaciado.lg, vertical: AppEspaciado.md),
         shape: forma,
         textStyle: TextStyle(
           fontSize: fontSizeBoton,
@@ -109,8 +109,8 @@ class AppBotones {
 
   static ButtonStyle estiloFilledPrimario(ColorScheme cs) =>
       FilledButton.styleFrom(
-        minimumSize: const Size.fromHeight(48),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        minimumSize: Size.fromHeight(AppTamanoIcono.extraGrande),
+        padding: EdgeInsets.symmetric(horizontal: AppEspaciado.lg, vertical: AppEspaciado.md),
         shape: forma,
         textStyle: TextStyle(
           fontSize: fontSizeBoton,
@@ -121,7 +121,7 @@ class AppBotones {
 
   static ButtonStyle estiloTexto(ColorScheme cs) =>
       TextButton.styleFrom(
-        minimumSize: const Size(48, 48),
+        minimumSize: Size(AppTamanoIcono.extraGrande, AppTamanoIcono.extraGrande),
         foregroundColor: cs.primary,
         shape: forma,
         textStyle: TextStyle(
@@ -133,7 +133,7 @@ class AppBotones {
 
   static ButtonStyle estiloTextoPequeno(ColorScheme cs) =>
       TextButton.styleFrom(
-        minimumSize: const Size(48, 48),
+        minimumSize: Size(AppTamanoIcono.extraGrande, AppTamanoIcono.extraGrande),
         foregroundColor: cs.primary,
         shape: forma,
         padding: const EdgeInsets.symmetric(
@@ -149,10 +149,10 @@ class AppBotones {
 
   static ButtonStyle estiloOutlinedSobreOscuro() =>
       OutlinedButton.styleFrom(
-        minimumSize: const Size.fromHeight(48),
+        minimumSize: Size.fromHeight(AppTamanoIcono.extraGrande),
         foregroundColor: Colors.white,
         side: const BorderSide(color: Colors.white54),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        padding: EdgeInsets.symmetric(horizontal: AppEspaciado.lg, vertical: AppEspaciado.md),
         shape: forma,
         textStyle: TextStyle(
           fontSize: fontSizeBoton,
@@ -163,7 +163,7 @@ class AppBotones {
 
   static ButtonStyle estiloTextoSobreOscuro() =>
       TextButton.styleFrom(
-        minimumSize: const Size(48, 48),
+        minimumSize: Size(AppTamanoIcono.extraGrande, AppTamanoIcono.extraGrande),
         foregroundColor: Colors.white70,
         shape: forma,
         textStyle: TextStyle(
@@ -175,8 +175,8 @@ class AppBotones {
 
   static ButtonStyle estiloFilledCta() =>
       FilledButton.styleFrom(
-        minimumSize: const Size.fromHeight(48),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        minimumSize: Size.fromHeight(AppTamanoIcono.extraGrande),
+        padding: EdgeInsets.symmetric(horizontal: AppEspaciado.lg, vertical: AppEspaciado.md),
         shape: forma,
         textStyle: TextStyle(
           fontSize: fontSizeBoton,
@@ -190,8 +190,8 @@ class AppBotones {
     EdgeInsetsGeometry? padding,
   }) =>
       FilledButton.styleFrom(
-        minimumSize: const Size.fromHeight(48),
-        padding: padding ?? const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        minimumSize: Size.fromHeight(AppTamanoIcono.extraGrande),
+        padding: padding ?? EdgeInsets.symmetric(horizontal: AppEspaciado.lg, vertical: AppEspaciado.md),
         shape: forma,
         textStyle: TextStyle(
           fontSize: fontSize ?? fontSizeBoton,
@@ -202,8 +202,8 @@ class AppBotones {
 
   static ButtonStyle estiloOutlinedSecundario() =>
       OutlinedButton.styleFrom(
-        minimumSize: const Size.fromHeight(48),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        minimumSize: Size.fromHeight(AppTamanoIcono.extraGrande),
+        padding: EdgeInsets.symmetric(horizontal: AppEspaciado.lg, vertical: AppEspaciado.md),
         shape: forma,
         textStyle: TextStyle(
           fontSize: fontSizeBoton,
@@ -216,8 +216,8 @@ class AppBotones {
       OutlinedButton.styleFrom(
         foregroundColor: cs.error,
         side: BorderSide(color: cs.error.withValues(alpha: 0.6)),
-        minimumSize: const Size.fromHeight(48),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        minimumSize: Size.fromHeight(AppTamanoIcono.extraGrande),
+        padding: EdgeInsets.symmetric(horizontal: AppEspaciado.lg, vertical: AppEspaciado.md),
         shape: forma,
         textStyle: TextStyle(
           fontSize: fontSizeBoton,

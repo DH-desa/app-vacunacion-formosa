@@ -4,7 +4,8 @@ import 'package:sistema_vacunacion/src/utils/encoding_utils.dart';
 
 List<ValidaVacunacion> validacionVacunaFromJson(String str) =>
     List<ValidaVacunacion>.from(
-        json.decode(str).map((x) => ValidaVacunacion.fromJson(x)));
+      json.decode(str).map((x) => ValidaVacunacion.fromJson(x)),
+    );
 
 String validacionVacunaToJson(List<ValidaVacunacion> data) =>
     json.encode(List<dynamic>.from(data.map((x) => x.toJson())));
@@ -44,7 +45,7 @@ class ValidaVacunacion {
   String? sysvacu04_nombre;
   // ignore: non_constant_identifier_names
   String? sysvacu05_nombre;
-// ignore: non_constant_identifier_names
+  // ignore: non_constant_identifier_names
   String? sysdesa10_fecha_aplicacion;
   // ignore: non_constant_identifier_names
   String? cumplen_veintiun_dias;
@@ -52,7 +53,7 @@ class ValidaVacunacion {
   String? fecha_proxima_dosis;
   // ignore: non_constant_identifier_names
   String? dias_transcurridos;
-// ignore: non_constant_identifier_names
+  // ignore: non_constant_identifier_names
   String? faltan_dias_proxima_aplicacion;
   // ignore: non_constant_identifier_names
   String? codigo_mensaje;
@@ -88,24 +89,27 @@ class ValidaVacunacion {
   }
 
   Map<String?, dynamic> toJson() => {
-        id_sysdesa10: id_sysdesa10,
-        sysdesa10_mensaje: sysdesa10_mensaje,
-        sysvacu04_nombre: sysvacu04_nombre,
-        sysvacu05_nombre: sysvacu05_nombre,
-        sysdesa10_fecha_aplicacion: sysdesa10_fecha_aplicacion,
-        cumplen_veintiun_dias: cumplen_veintiun_dias,
-        fecha_proxima_dosis: fecha_proxima_dosis,
-        dias_transcurridos: dias_transcurridos,
-        faltan_dias_proxima_aplicacion: faltan_dias_proxima_aplicacion,
-        codigo_mensaje: codigo_mensaje,
-        mensaje: mensaje,
-      };
+    id_sysdesa10: id_sysdesa10,
+    sysdesa10_mensaje: sysdesa10_mensaje,
+    sysvacu04_nombre: sysvacu04_nombre,
+    sysvacu05_nombre: sysvacu05_nombre,
+    sysdesa10_fecha_aplicacion: sysdesa10_fecha_aplicacion,
+    cumplen_veintiun_dias: cumplen_veintiun_dias,
+    fecha_proxima_dosis: fecha_proxima_dosis,
+    dias_transcurridos: dias_transcurridos,
+    faltan_dias_proxima_aplicacion: faltan_dias_proxima_aplicacion,
+    codigo_mensaje: codigo_mensaje,
+    mensaje: mensaje,
+  };
 
   ValidaVacunacion.fromJsonList(List<dynamic>? jsonList) {
     if (jsonList == null) return;
 
-    for (var item in jsonList) {
-      final valVacunas = ValidaVacunacion.fromJsonMap(item);
+    for (final item in jsonList) {
+      if (item is! Map) continue;
+      final valVacunas = ValidaVacunacion.fromJsonMap(
+        Map<String, dynamic>.from(item),
+      );
       items.add(valVacunas);
     }
   }

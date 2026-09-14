@@ -32,7 +32,7 @@ class Lotes {
   String? sysdesa18_lote;
   // ignore: non_constant_identifier_names
   String? sysdesa18_cantidad_actual;
-// ignore: non_constant_identifier_names
+  // ignore: non_constant_identifier_names
   String? sysdesa18_fecha_vencimiento;
   // ignore: non_constant_identifier_names
   String? sysvacu02_descripcion;
@@ -42,14 +42,14 @@ class Lotes {
   String? mensaje;
 
   factory Lotes.fromJson(Map<String, dynamic> json) => Lotes(
-        id_sysdesa18: json["id_sysdesa18"],
-        sysdesa18_lote: fixEncoding(json["sysdesa18_lote"]),
-        sysdesa18_cantidad_actual: json["sysdesa18_cantidad_actual"],
-        sysdesa18_fecha_vencimiento: json["sysdesa18_fecha_vencimiento"],
-        sysvacu02_descripcion: fixEncoding(json["sysvacu02_descripcion"]),
-        codigo_mensaje: json["codigo_mensaje"],
-        mensaje: fixEncoding(json["mensaje"]),
-      );
+    id_sysdesa18: json["id_sysdesa18"],
+    sysdesa18_lote: fixEncoding(json["sysdesa18_lote"]),
+    sysdesa18_cantidad_actual: json["sysdesa18_cantidad_actual"],
+    sysdesa18_fecha_vencimiento: json["sysdesa18_fecha_vencimiento"],
+    sysvacu02_descripcion: fixEncoding(json["sysvacu02_descripcion"]),
+    codigo_mensaje: json["codigo_mensaje"],
+    mensaje: fixEncoding(json["mensaje"]),
+  );
 
   Lotes.fromJsonMap(Map<String, dynamic> json) {
     id_sysdesa18 = json["id_sysdesa18"];
@@ -62,20 +62,21 @@ class Lotes {
   }
 
   Map<String?, dynamic> toJson() => {
-        id_sysdesa18: id_sysdesa18,
-        sysdesa18_lote: sysdesa18_lote,
-        sysdesa18_cantidad_actual: sysdesa18_cantidad_actual,
-        sysdesa18_fecha_vencimiento: sysdesa18_fecha_vencimiento,
-        sysvacu02_descripcion: sysvacu02_descripcion,
-        codigo_mensaje: codigo_mensaje,
-        mensaje: mensaje,
-      };
+    id_sysdesa18: id_sysdesa18,
+    sysdesa18_lote: sysdesa18_lote,
+    sysdesa18_cantidad_actual: sysdesa18_cantidad_actual,
+    sysdesa18_fecha_vencimiento: sysdesa18_fecha_vencimiento,
+    sysvacu02_descripcion: sysvacu02_descripcion,
+    codigo_mensaje: codigo_mensaje,
+    mensaje: mensaje,
+  };
 
   Lotes.fromJsonList(List<dynamic>? jsonList) {
     if (jsonList == null) return;
 
-    for (var item in jsonList) {
-      final lotes = Lotes.fromJsonMap(item);
+    for (final item in jsonList) {
+      if (item is! Map) continue;
+      final lotes = Lotes.fromJsonMap(Map<String, dynamic>.from(item));
       items.add(lotes);
     }
   }

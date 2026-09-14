@@ -1,5 +1,8 @@
 plugins {
     id "com.android.application"
+    // START: FlutterFire Configuration
+    id 'com.google.gms.google-services'
+    // END: FlutterFire Configuration
     id "kotlin-android"
     id "dev.flutter.flutter-gradle-plugin"
 }
@@ -42,6 +45,20 @@ android {
             keyPassword keystoreProperties['keyPassword']
             storeFile keystoreProperties['storeFile'] ? file(keystoreProperties['storeFile']) : null
             storePassword keystoreProperties['storePassword']
+        }
+    }
+
+    flavorDimensions += "env"
+    productFlavors {
+        demo {
+            dimension "env"
+            applicationIdSuffix ".demo"
+            versionNameSuffix "-demo"
+            manifestPlaceholders = [appLabel: "DEMO Sistema Vacunación"]
+        }
+        prod {
+            dimension "env"
+            manifestPlaceholders = [appLabel: "Sistema Vacunación"]
         }
     }
 

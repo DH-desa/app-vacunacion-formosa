@@ -34,12 +34,12 @@ class Vacunador {
   String? mensaje;
 
   factory Vacunador.fromJson(Map<String, dynamic> json) => Vacunador(
-        id_sysdesa12: json["id_sysdesa12"],
-        sysdesa06_nro_documento: json["sysdesa06_nro_documento"],
-        sysdesa06_nombre: fixEncoding(json["sysdesa06_nombre"]),
-        codigo_mensaje: json["codigo_mensaje"],
-        mensaje: fixEncoding(json["mensaje"]),
-      );
+    id_sysdesa12: json["id_sysdesa12"],
+    sysdesa06_nro_documento: json["sysdesa06_nro_documento"],
+    sysdesa06_nombre: fixEncoding(json["sysdesa06_nombre"]),
+    codigo_mensaje: json["codigo_mensaje"],
+    mensaje: fixEncoding(json["mensaje"]),
+  );
 
   Vacunador.fromJsonMap(Map<String, dynamic> json) {
     id_sysdesa12 = json["id_sysdesa12"];
@@ -50,18 +50,19 @@ class Vacunador {
   }
 
   Map<String?, dynamic> toJson() => {
-        id_sysdesa12: id_sysdesa12,
-        sysdesa06_nro_documento: sysdesa06_nro_documento,
-        sysdesa06_nombre: sysdesa06_nombre,
-        codigo_mensaje: codigo_mensaje,
-        mensaje: mensaje,
-      };
+    id_sysdesa12: id_sysdesa12,
+    sysdesa06_nro_documento: sysdesa06_nro_documento,
+    sysdesa06_nombre: sysdesa06_nombre,
+    codigo_mensaje: codigo_mensaje,
+    mensaje: mensaje,
+  };
 
   Vacunador.fromJsonList(List<dynamic>? jsonList) {
     if (jsonList == null) return;
 
-    for (var item in jsonList) {
-      final vacunador = Vacunador.fromJsonMap(item);
+    for (final item in jsonList) {
+      if (item is! Map) continue;
+      final vacunador = Vacunador.fromJsonMap(Map<String, dynamic>.from(item));
       items.add(vacunador);
     }
   }

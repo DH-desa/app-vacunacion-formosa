@@ -4,7 +4,8 @@ import 'package:sistema_vacunacion/src/utils/encoding_utils.dart';
 
 List<MensajeServidor> mensajeServidorFromJson(String str) =>
     List<MensajeServidor>.from(
-        json.decode(str).map((x) => MensajeServidor.fromJson(x)));
+      json.decode(str).map((x) => MensajeServidor.fromJson(x)),
+    );
 
 String mensajeServidorToJson(List<MensajeServidor> data) =>
     json.encode(List<dynamic>.from(data.map((x) => x.toJson())));
@@ -36,14 +37,17 @@ class MensajeServidor {
   }
 
   Map<String?, dynamic> toJson() => {
-        codigo_mensaje: codigo_mensaje,
-        mensaje: mensaje,
-      };
+    codigo_mensaje: codigo_mensaje,
+    mensaje: mensaje,
+  };
 
   MensajeServidor.fromJsonList(List<dynamic>? jsonList) {
     if (jsonList == null) return;
-    for (var item in jsonList) {
-      final menServidor = MensajeServidor.fromJsonMap(item);
+    for (final item in jsonList) {
+      if (item is! Map) continue;
+      final menServidor = MensajeServidor.fromJsonMap(
+        Map<String, dynamic>.from(item),
+      );
       items.add(menServidor);
     }
   }

@@ -4,7 +4,8 @@ import 'package:sistema_vacunacion/src/utils/encoding_utils.dart';
 
 List<CantidadVacunados> cantidadVacunadosFromJson(String str) =>
     List<CantidadVacunados>.from(
-        json.decode(str).map((x) => CantidadVacunados.fromJson(x)));
+      json.decode(str).map((x) => CantidadVacunados.fromJson(x)),
+    );
 
 String cantidadVacunadosToJson(List<CantidadVacunados> data) =>
     json.encode(List<dynamic>.from(data.map((x) => x.toJson())));
@@ -48,17 +49,20 @@ class CantidadVacunados {
   }
 
   Map<String?, dynamic> toJson() => {
-        id_sysdesa12: id_sysdesa12,
-        cantidad_aplicaciones: cantidad_aplicaciones,
-        codigo_mensaje: codigo_mensaje,
-        mensaje: mensaje,
-      };
+    id_sysdesa12: id_sysdesa12,
+    cantidad_aplicaciones: cantidad_aplicaciones,
+    codigo_mensaje: codigo_mensaje,
+    mensaje: mensaje,
+  };
 
   CantidadVacunados.fromJsonList(List<dynamic>? jsonList) {
     if (jsonList == null) return;
 
-    for (var item in jsonList) {
-      final cantidad = CantidadVacunados.fromJsonMap(item);
+    for (final item in jsonList) {
+      if (item is! Map) continue;
+      final cantidad = CantidadVacunados.fromJsonMap(
+        Map<String, dynamic>.from(item),
+      );
       items.add(cantidad);
     }
   }

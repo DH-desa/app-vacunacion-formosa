@@ -26,7 +26,6 @@ class _ResumenSesionVacunacionState extends State<ResumenSesionVacunacion> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final tt = Theme.of(context).textTheme;
     final bar = context.sisTipografia;
 
     final String establecimiento =
@@ -60,10 +59,10 @@ class _ResumenSesionVacunacionState extends State<ResumenSesionVacunacion> {
                         children: [
                           Text(
                             'Sesión de vacunación',
-                            style: bar.tituloTarjeta.copyWith(
-                              fontSize: widget.compendio ? 19 : 22,
-                              color: cs.onSurface,
-                            ),
+                            style: (widget.compendio
+                                    ? bar.subtituloTarjeta
+                                    : bar.tituloTarjeta)
+                                .copyWith(color: cs.onSurface),
                           ),
                           if (!_expandido) ...[
                             const SizedBox(height: AppEspaciado.xs),
@@ -71,8 +70,11 @@ class _ResumenSesionVacunacionState extends State<ResumenSesionVacunacion> {
                               establecimiento,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: tt.bodySmall?.copyWith(
-                                fontSize: widget.compendio ? 12 : 13,
+                              style: (widget.compendio
+                                      ? bar.textoChip
+                                      : bar.textoSecundario)
+                                  .copyWith(
+                                fontWeight: FontWeight.w400,
                                 color: cs.onSurfaceVariant,
                               ),
                             ),
@@ -105,8 +107,10 @@ class _ResumenSesionVacunacionState extends State<ResumenSesionVacunacion> {
                 children: [
                   Text(
                     'Lo que se usará al registrar la aplicación',
-                    style: tt.bodySmall?.copyWith(
-                      fontSize: widget.compendio ? 12 : 13,
+                    style: (widget.compendio
+                            ? bar.textoChip
+                            : bar.textoSecundario)
+                        .copyWith(
                       height: 1.35,
                       color: cs.onSurfaceVariant,
                     ),
@@ -151,7 +155,7 @@ class _ResumenSesionVacunacionState extends State<ResumenSesionVacunacion> {
     required String valor,
   }) {
     final cs = Theme.of(context).colorScheme;
-    final tt = Theme.of(context).textTheme;
+    final bar = context.sisTipografia;
     return Padding(
       padding: const EdgeInsets.only(bottom: AppEspaciado.sm),
       child: Row(
@@ -161,19 +165,18 @@ class _ResumenSesionVacunacionState extends State<ResumenSesionVacunacion> {
             width: anchoEtiqueta,
             child: Text(
               etiqueta,
-              style: tt.bodySmall?.copyWith(
+              style: (compendio ? bar.textoChip : bar.textoSecundario)
+                  .copyWith(
                 fontWeight: FontWeight.w700,
                 color: cs.onSurfaceVariant,
-                fontSize: compendio ? 12 : 13,
               ),
             ),
           ),
           Expanded(
             child: Text(
               valor,
-              style: tt.bodyMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-                fontSize: compendio ? 14 : 15,
+              style: (compendio ? bar.textoPrincipal : bar.textoDestacado)
+                  .copyWith(
                 height: 1.3,
                 color: cs.onSurface,
               ),

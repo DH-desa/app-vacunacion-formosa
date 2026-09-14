@@ -19,3 +19,4 @@ export 'package:sistema_vacunacion/src/domain/entities/tutor_models.dart';
 export 'package:sistema_vacunacion/src/domain/entities/vacunas/vacunas_condicion_model.dart';
 export 'package:sistema_vacunacion/src/domain/entities/vacunas/vacunas_esquema_model.dart';
 export 'package:sistema_vacunacion/src/domain/entities/vacunas/vacunas_dosis_model.dart';
+export 'package:sistema_vacunacion/src/domain/entities/vacunas/vacunas_pendientes_model.dart';

@@ -8,6 +8,7 @@ export 'package:sistema_vacunacion/src/presentation/state/usuariobeneficiario_se
 export 'package:sistema_vacunacion/src/presentation/state/situacionbeneficiario_service.dart';
 export 'package:sistema_vacunacion/src/presentation/state/tutor_service.dart';
 export 'package:sistema_vacunacion/src/presentation/state/notificacionesdosis_service.dart';
+export 'package:sistema_vacunacion/src/presentation/state/vacunaspendientes_service.dart';
 export 'package:sistema_vacunacion/src/presentation/state/vacunascant_service.dart';
 export 'package:sistema_vacunacion/src/presentation/state/vacunadoscant_service.dart';
 export 'package:sistema_vacunacion/src/presentation/state/vacunasconfiguracion_service.dart';

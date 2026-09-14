@@ -1,6 +1,34 @@
 {
   "releases": [
     {
+      "version": "4.1.0",
+      "fecha": "2026-08",
+      "titulo": "Versión 4.1 — sesión de vacunación multi-registro y rediseño de la pantalla de vacunas",
+      "features": [
+        "Situación del beneficiario (embarazada, puérpera, personal de salud) visible y editable durante la carga, con la matriz del Calendario Nacional 2026.",
+        "Historial de dosis de la persona se actualiza automáticamente al registrar más de una vacuna en la misma visita.",
+        "El perfil de vacunación elegido se mantiene entre vacunas de la misma visita, sin tener que volver a seleccionarlo cada vez.",
+        "Aviso (no bloqueante) cuando la vacuna y dosis que se va a registrar ya figura aplicada en la visita o en el historial de la persona.",
+        "Cancelar el registro de una vacuna ahora permite elegir entre volver, salir a buscar otra persona o descartar solo la vacuna en curso, sin perder los datos ya cargados.",
+        "Rediseño de la pantalla de vacunas: el formulario queda como protagonista, el calendario y el historial pasan a hojas inferiores, y la identidad del beneficiario y la alerta de tutor faltante quedan siempre visibles.",
+        "Modales, diálogos de alerta y hojas inferiores unificados en un mismo componente visual en toda la app."
+      ],
+      "fixes": [
+        "El escáner de DNI ahora valida también la respuesta del servidor para el beneficiario escaneado (antes solo se validaba en la carga manual y en el tutor).",
+        "La condición gestacional se revalida contra el sexo real informado por el servidor, no solo contra lo tildado en el formulario.",
+        "La fecha de aplicación ya no permite elegirse antes de la fecha de nacimiento de la persona.",
+        "El campo sexo del formulario manual (beneficiario/tutor) ya no completa \"Femenino\" por defecto: hay que elegirlo.",
+        "Corrección del input de D.N.I. que perdía el borde redondeado al enfocarse.",
+        "Corrección del bottom sheet de detalle del beneficiario, que no permitía hacer scroll."
+      ],
+      "maintenance": [
+        "Reorganización interna del código a arquitectura por capas (core/data/domain/presentation).",
+        "Migración del manejo de estado interno de la app a un modelo más simple y consistente, reemplazando streams por listeners en las pantallas de vacunas y vacunador.",
+        "Limpieza de código sin uso y de escrituras redundantes en la sesión de vacunación en terreno."
+      ],
+      "items": []
+    },
+    {
       "version": "4.0.0",
       "fecha": "2026-04",
       "titulo": "Versión 4.0 — actualización mayor de la app",

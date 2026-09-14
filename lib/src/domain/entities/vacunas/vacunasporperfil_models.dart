@@ -24,11 +24,11 @@ class VacunasxPerfil {
   String? mensaje;
 
   factory VacunasxPerfil.fromJson(Map<String, dynamic> json) => VacunasxPerfil(
-        id_sysvacu04: json["id_sysvacu04"],
-        sysvacu04_nombre: fixEncoding(json["sysvacu04_nombre"]),
-        codigo_mensaje: json["codigo_mensaje"],
-        mensaje: fixEncoding(json["mensaje"]),
-      );
+    id_sysvacu04: json["id_sysvacu04"],
+    sysvacu04_nombre: fixEncoding(json["sysvacu04_nombre"]),
+    codigo_mensaje: json["codigo_mensaje"],
+    mensaje: fixEncoding(json["mensaje"]),
+  );
 
   VacunasxPerfil.fromJsonMap(Map<String, dynamic> json) {
     id_sysvacu04 = json["id_sysvacu04"];
@@ -38,17 +38,20 @@ class VacunasxPerfil {
   }
 
   Map<String, dynamic> toJson() => {
-        "id_sysvacu04": id_sysvacu04,
-        "sysvacu04_nombre": sysvacu04_nombre,
-        "codigo_mensaje": codigo_mensaje,
-        "mensaje": mensaje,
-      };
+    "id_sysvacu04": id_sysvacu04,
+    "sysvacu04_nombre": sysvacu04_nombre,
+    "codigo_mensaje": codigo_mensaje,
+    "mensaje": mensaje,
+  };
 
   VacunasxPerfil.fromJsonList(List<dynamic>? jsonList) {
     if (jsonList == null) return;
 
-    for (var item in jsonList) {
-      final vacunasxperfiles = VacunasxPerfil.fromJsonMap(item);
+    for (final item in jsonList) {
+      if (item is! Map) continue;
+      final vacunasxperfiles = VacunasxPerfil.fromJsonMap(
+        Map<String, dynamic>.from(item),
+      );
       items.add(vacunasxperfiles);
     }
   }

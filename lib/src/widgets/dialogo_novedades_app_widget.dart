@@ -9,7 +9,7 @@ Future<void> mostrarDialogoNovedadesApp(BuildContext context) {
     context: context,
     builder: (BuildContext ctx) {
       final ColorScheme cs = Theme.of(ctx).colorScheme;
-      final TextTheme tt = Theme.of(ctx).textTheme;
+      final bar = ctx.sisTipografia;
       return Dialog(
         insetPadding: const EdgeInsets.symmetric(
           horizontal: AppEspaciado.md,
@@ -52,18 +52,16 @@ Future<void> mostrarDialogoNovedadesApp(BuildContext context) {
                       children: <Widget>[
                         Text(
                           'Notas de versión',
-                          style: tt.titleLarge?.copyWith(
-                            fontSize: 19,
+                          style: bar.tituloSeccion.copyWith(
                             fontWeight: FontWeight.w800,
                             color: cs.onSurface,
                             height: 1.15,
                           ),
                         ),
-                        const SizedBox(height: 2),
+                        const SizedBox(height: AppEspaciado.xs),
                         Text(
                           'Novedades · Correcciones · Plataforma',
-                          style: tt.labelLarge?.copyWith(
-                            fontSize: 11.5,
+                          style: bar.etiquetaSeccion.copyWith(
                             fontWeight: FontWeight.w600,
                             letterSpacing: 0.2,
                             color: cs.onSurfaceVariant,
@@ -151,7 +149,7 @@ class _ListaChangelogCargadaState extends State<_ListaChangelogCargada> {
         return Scrollbar(
           thumbVisibility: true,
           child: ListView.separated(
-            padding: const EdgeInsets.only(right: 8, bottom: 8),
+            padding: const EdgeInsets.only(right: AppEspaciado.sm, bottom: AppEspaciado.sm),
             itemCount: entradas.length,
             separatorBuilder: (_, __) => const SizedBox(height: AppEspaciado.lg),
             itemBuilder: (BuildContext context, int i) {
@@ -175,7 +173,7 @@ class _TarjetaRelease extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tt = Theme.of(context).textTheme;
+    final bar = context.sisTipografia;
     final String? fecha = entrada.fecha;
     final String? titulo = entrada.titulo;
 
@@ -203,8 +201,7 @@ class _TarjetaRelease extends StatelessWidget {
             children: <Widget>[
               Text(
                 'v${entrada.version}',
-                style: tt.titleMedium?.copyWith(
-                  fontSize: 16,
+                style: bar.textoFormulario.copyWith(
                   fontWeight: FontWeight.w800,
                   color: cs.primary,
                 ),
@@ -212,16 +209,15 @@ class _TarjetaRelease extends StatelessWidget {
               if (fecha != null && fecha.isNotEmpty)
                 Container(
                   padding:
-                      const EdgeInsets.symmetric(horizontal: AppEspaciado.sm, vertical: 3),
+                      const EdgeInsets.symmetric(horizontal: AppEspaciado.sm, vertical: AppEspaciado.xs),
                   decoration: BoxDecoration(
                     color: cs.secondaryContainer.withValues(alpha: 0.85),
                     borderRadius: BorderRadius.circular(AppEspaciado.sm),
                   ),
                   child: Text(
                     fecha,
-                    style: tt.labelSmall?.copyWith(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
+                    style: bar.etiquetaSeccion.copyWith(
+                      letterSpacing: 0,
                       color: cs.onSecondaryContainer,
                     ),
                   ),
@@ -232,8 +228,7 @@ class _TarjetaRelease extends StatelessWidget {
             const SizedBox(height: AppEspaciado.sm),
             Text(
               titulo,
-              style: tt.titleSmall?.copyWith(
-                fontSize: 13,
+              style: bar.textoSecundario.copyWith(
                 fontWeight: FontWeight.w700,
                 height: 1.3,
                 color: cs.onSurface,
@@ -290,8 +285,8 @@ class _TarjetaRelease extends StatelessWidget {
           else
             Text(
               'Sin detalle para esta versión.',
-              style: tt.bodySmall?.copyWith(
-                fontSize: 12,
+              style: bar.textoChip.copyWith(
+                fontWeight: FontWeight.w400,
                 color: cs.onSurfaceVariant,
               ),
             ),
@@ -322,7 +317,7 @@ class _BloqueCategoria extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tt = Theme.of(context).textTheme;
+    final bar = context.sisTipografia;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(
@@ -348,24 +343,23 @@ class _BloqueCategoria extends StatelessWidget {
               Expanded(
                 child: Text(
                   titulo,
-                  style: tt.titleSmall?.copyWith(
-                    fontSize: 13,
+                  style: bar.textoSecundario.copyWith(
                     fontWeight: FontWeight.w800,
                     color: cs.onSurface,
                   ),
                 ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                padding: const EdgeInsets.symmetric(horizontal: AppEspaciado.sm, vertical: AppEspaciado.xs),
                 decoration: BoxDecoration(
                   color: colorAcento.withValues(alpha: 0.18),
                   borderRadius: BorderRadius.circular(999),
                 ),
                 child: Text(
                   '$conteo',
-                  style: tt.labelSmall?.copyWith(
-                    fontSize: 11,
+                  style: bar.etiquetaSeccion.copyWith(
                     fontWeight: FontWeight.w800,
+                    letterSpacing: 0,
                     color: colorAcento,
                   ),
                 ),
@@ -375,16 +369,16 @@ class _BloqueCategoria extends StatelessWidget {
           const SizedBox(height: AppEspaciado.sm),
           ...lineas.map(
             (String linea) => Padding(
-              padding: const EdgeInsets.only(bottom: 7),
+              padding: const EdgeInsets.only(bottom: AppEspaciado.sm),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
                   Padding(
-                    padding: const EdgeInsets.only(top: 3),
+                    padding: const EdgeInsets.only(top: AppEspaciado.xs),
                     child: Container(
                       width: 5,
                       height: 5,
-                      margin: const EdgeInsets.only(right: 10, top: 2),
+                      margin: const EdgeInsets.only(right: AppEspaciado.sm, top: AppEspaciado.xs),
                       decoration: BoxDecoration(
                         color: colorAcento.withValues(alpha: 0.75),
                         shape: BoxShape.circle,
@@ -394,8 +388,7 @@ class _BloqueCategoria extends StatelessWidget {
                   Expanded(
                     child: Text(
                       linea,
-                      style: tt.bodyMedium?.copyWith(
-                        fontSize: 12.5,
+                      style: bar.textoSecundario.copyWith(
                         height: 1.42,
                         fontWeight: FontWeight.w500,
                         color: cs.onSurface,

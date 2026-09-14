@@ -95,6 +95,7 @@ class _FormularioDocumentoState extends State<FormularioDocumento> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
+    final bar = context.sisTipografia;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -123,8 +124,7 @@ class _FormularioDocumentoState extends State<FormularioDocumento> {
                     const EdgeInsets.symmetric(horizontal: AppEspaciado.sm),
                 child: Text(
                   'o ingresá los datos',
-                  style: tt.labelSmall?.copyWith(
-                    fontSize: 11,
+                  style: bar.etiquetaSeccion.copyWith(
                     letterSpacing: 0.3,
                     color: AppSuperficies.textoSecundario(context),
                   ),
@@ -207,6 +207,7 @@ class _FormularioDocumentoState extends State<FormularioDocumento> {
   }
 
   Widget _campoDni(ColorScheme cs, TextTheme tt) {
+    final bar = context.sisTipografia;
     return Container(
       clipBehavior: Clip.antiAlias,
       decoration: AppSuperficies.campoBusqueda(context),
@@ -217,7 +218,7 @@ class _FormularioDocumentoState extends State<FormularioDocumento> {
         maxLength: 8,
         focusNode: widget.focusNode,
         onEditingComplete: () => widget.focusNode?.unfocus(),
-        style: tt.titleMedium?.copyWith(fontSize: 16, color: cs.onSurface),
+        style: bar.textoFormulario.copyWith(color: cs.onSurface),
         decoration: InputDecoration(
           filled: true,
           fillColor: cs.surfaceContainer,
@@ -227,8 +228,8 @@ class _FormularioDocumentoState extends State<FormularioDocumento> {
             color: cs.onSurfaceVariant,
           ),
           hintText: 'D.N.I.',
-          hintStyle: tt.bodyLarge?.copyWith(
-            fontSize: 15,
+          hintStyle: bar.textoDestacado.copyWith(
+            fontWeight: FontWeight.w400,
             color: AppSuperficies.textoSecundario(context),
           ),
           focusedBorder: InputBorder.none,
@@ -242,6 +243,7 @@ class _FormularioDocumentoState extends State<FormularioDocumento> {
     const colorFemenino = Color(0xFFE91E8C);
     const colorMasculino = Color(0xFF009CAF);
     const colorNoBinario = Color(0xFF7C5CBF);
+    final bar = context.sisTipografia;
 
     Widget chip({
       required bool seleccionado,
@@ -281,8 +283,7 @@ class _FormularioDocumentoState extends State<FormularioDocumento> {
                   const SizedBox(height: AppEspaciado.xs),
                   Text(
                     etiqueta,
-                    style: tt.titleSmall?.copyWith(
-                      fontSize: 14,
+                    style: bar.textoPrincipal.copyWith(
                       fontWeight:
                           seleccionado ? FontWeight.w800 : FontWeight.w600,
                       color: seleccionado ? colorAccento : cs.onSurfaceVariant,
@@ -301,8 +302,7 @@ class _FormularioDocumentoState extends State<FormularioDocumento> {
       children: [
         Text(
           'Sexo',
-          style: tt.labelLarge?.copyWith(
-            fontSize: 12,
+          style: bar.textoChip.copyWith(
             fontWeight: FontWeight.w700,
             letterSpacing: 0.2,
             color: AppSuperficies.textoSecundario(context),
@@ -329,7 +329,7 @@ class _FormularioDocumentoState extends State<FormularioDocumento> {
             const SizedBox(width: AppEspaciado.sm),
             chip(
               seleccionado: _sexo == 'X',
-              etiqueta: 'No binario (X)',
+              etiqueta: 'No binario',
               icono: Icons.transgender_rounded,
               colorAccento: colorNoBinario,
               onTap: () => _cambiarSexo('X'),

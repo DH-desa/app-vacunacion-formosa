@@ -2,6 +2,7 @@ import 'package:animate_do/animate_do.dart';
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:sistema_vacunacion/src/config/config.dart';
+import 'package:sistema_vacunacion/src/core/helpers/helpers.dart';
 import 'package:sistema_vacunacion/src/domain/entities/models.dart';
 import 'package:sistema_vacunacion/src/pages/pages.dart';
 import 'package:sistema_vacunacion/src/pages/vacuna/vacunas_ui_helpers.dart';
@@ -31,6 +32,11 @@ class _VacunasPageState extends State<VacunasPage> {
   /// wserv_listados_vacunas.php (aún sin conectar, placeholder). Son dos
   /// caminos distintos, no un filtro dentro del wizard de perfil.
   String _modoRegistro = 'pendientes';
+
+  /// Solo aplica a la vía 'pendientes': si está activado, bloquea la
+  /// selección de una dosis cuando una dosis anterior de la misma vacuna
+  /// sigue pendiente (no aplicada). Habilitable/deshabilitable en pantalla.
+  bool _validarOrdenDosis = true;
   VacunasCondicion? _selectCondicion;
   VacunasEsquema? _selectEsquema;
   VacunasDosis? _selectDosis;
@@ -55,9 +61,14 @@ class _VacunasPageState extends State<VacunasPage> {
       TextEditingController();
   final TextEditingController controladorBusquedaLotes =
       TextEditingController();
+  final TextEditingController controladorBusquedaHistorialDosis =
+      TextEditingController();
+  final TextEditingController controladorLoteManual = TextEditingController();
   late FocusNode focusNode;
 
   bool _recargandoPerfiles = false;
+  bool _recargandoPendientes = false;
+  bool _cargandoLotePendiente = false;
   bool _registrando = false;
 
   final ScrollController _generalScroll = ScrollController();
@@ -96,32 +107,51 @@ class _VacunasPageState extends State<VacunasPage> {
     });
     loadingLoginService.cargaPerfil(true);
     listaLotes!.clear();
-    final tempLista = await vacunasxPerfiles.obtenerVacunasxPerfilesProviders(
-      perfilHeredado.id_sysvacu12,
-      beneficiarioService.beneficiario!.sysdesa10_dni,
-      beneficiarioService.beneficiario!.sysdesa10_sexo,
-    );
-    if (!mounted) return;
-    // `obtenerVacunasxPerfilesProviders` devuelve `0` (int) cuando el perfil
-    // no tiene vacunas configuradas — no una `List`. Guardia de tipo antes de
-    // indexar para no crashear con "int no tiene operador []".
-    if (tempLista is List &&
-        tempLista.isNotEmpty &&
-        tempLista[0].codigo_mensaje == "0") {
+    try {
+      final tempLista = await vacunasxPerfiles.obtenerVacunasxPerfilesProviders(
+        perfilHeredado.id_sysvacu12,
+        beneficiarioService.beneficiario!.sysdesa10_dni,
+        beneficiarioService.beneficiario!.sysdesa10_sexo,
+      );
+      if (!mounted) return;
+      // `obtenerVacunasxPerfilesProviders` solo devuelve `null` (cargó bien)
+      // o `0` (int) cuando el perfil no tiene vacunas configuradas — nunca
+      // una `List` con `codigo_mensaje`.
+      if (tempLista == 0) {
+        showDialog(
+          context: _scaffoldKey.currentContext!,
+          builder: (dialogCtx) => DialogoAlerta(
+            envioFuncion2: false,
+            envioFuncion1: false,
+            tituloAlerta: 'Sin vacunas configuradas',
+            descripcionAlerta:
+                'El perfil "${perfilHeredado.sysvacu12_descripcion}" no tiene vacunas configuradas.',
+            textoBotonAlerta: 'Listo',
+            icon: const Icon(Icons.error_outline, size: 40),
+            color: Theme.of(dialogCtx).colorScheme.error,
+          ),
+        );
+      }
+    } catch (_) {
+      if (!mounted) return;
       showDialog(
         context: _scaffoldKey.currentContext!,
         builder: (dialogCtx) => DialogoAlerta(
           envioFuncion2: false,
           envioFuncion1: false,
-          tituloAlerta: 'No se pudieron cargar las vacunas del perfil',
-          descripcionAlerta: tempLista[0].mensaje,
+          tituloAlerta: 'Sin conexión',
+          descripcionAlerta:
+              'No se pudieron cargar las vacunas del perfil. Revise la red e intente de nuevo.',
           textoBotonAlerta: 'Listo',
-          icon: const Icon(Icons.error_outline, size: 40),
+          icon: const Icon(Icons.wifi_off_rounded, size: 40),
           color: Theme.of(dialogCtx).colorScheme.error,
         ),
       );
-    } else {
-      loadingLoginService.cargaPerfil(false);
+    } finally {
+      // Pase lo que pase (éxito, sin vacunas, o error de red) el spinner de
+      // paso 2 tiene que apagarse: si no, `containerVacunas()` queda
+      // colgado en `LoadingEstrellas()` para siempre.
+      if (mounted) loadingLoginService.cargaPerfil(false);
     }
   }
 
@@ -139,6 +169,8 @@ class _VacunasPageState extends State<VacunasPage> {
     controladorBusquedaCondicion.dispose();
     controladorBusquedaEsquema.dispose();
     controladorBusquedaDosis.dispose();
+    controladorBusquedaHistorialDosis.dispose();
+    controladorLoteManual.dispose();
     super.dispose();
   }
 
@@ -155,7 +187,7 @@ class _VacunasPageState extends State<VacunasPage> {
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, result) {
-        if (!didPop) onWillPop();
+        if (!didPop) onWillPop(_scaffoldKey.currentContext ?? context);
       },
       child: Scaffold(
         key: _scaffoldKey,
@@ -212,7 +244,26 @@ class _VacunasPageState extends State<VacunasPage> {
                         children: [
                           VacunasPanelFlujo(
                             pasoActual: pasos,
-                            onIrAPaso: (p) => setState(() => pasos = p),
+                            onIrAPaso: (p) {
+                              // Vía "Pendientes": no hay editor por-campo para Vacuna
+                              // (containerVacunas depende del perfil, que acá nunca se
+                              // eligió). Igual que "Cambiar" en containerVerificar,
+                              // reabrir Vacuna vuelve al paso 1 (lista de pendientes).
+                              final destino =
+                                  (_modoRegistro == 'pendientes' && p == 2)
+                                  ? 1
+                                  : p;
+                              setState(() {
+                                _limpiarDesdePaso(destino);
+                                pasos = destino;
+                              });
+                            },
+                            // Vía "Pendientes": el pendiente elegido precarga vacuna,
+                            // condición, esquema y dosis; Condición/Esquema/Dosis/Lote
+                            // quedan fijos, solo Vacuna (paso 2) sigue editable.
+                            puedeIrAPaso: _modoRegistro == 'pendientes'
+                                ? (p) => p == 2
+                                : null,
                             perfil: _selectPerfil?.sysvacu12_descripcion,
                             vacuna: _selectVacunas?.sysvacu04_nombre,
                             condicion: _selectCondicion?.sysvacu01_descripcion,
@@ -222,6 +273,16 @@ class _VacunasPageState extends State<VacunasPage> {
                                 ? '${_selectFecha.day.toString().padLeft(2, '0')}/${_selectFecha.month.toString().padLeft(2, '0')}/${_selectFecha.year}'
                                 : null,
                             lote: _selectLote?.sysdesa18_lote,
+                            nombrePasoOverride:
+                                (_modoRegistro == 'pendientes' && pasos == 1)
+                                ? 'Pendientes'
+                                : null,
+                            pasoActualDisplay: _modoRegistro == 'pendientes'
+                                ? _pasoMostradoPendientes(pasos)
+                                : null,
+                            totalPasosDisplay: _modoRegistro == 'pendientes'
+                                ? 3
+                                : null,
                             child: containerPasos(),
                           ),
                           const SizedBox(height: AppEspaciado.md),
@@ -285,7 +346,7 @@ class _VacunasPageState extends State<VacunasPage> {
     final b = beneficiarioService.beneficiario;
     if (b == null) return const SizedBox.shrink();
     final cs = Theme.of(context).colorScheme;
-    final tt = Theme.of(context).textTheme;
+    final bar = context.sisTipografia;
     final nombre = [
       b.sysdesa10_nombre,
       b.sysdesa10_apellido,
@@ -315,8 +376,7 @@ class _VacunasPageState extends State<VacunasPage> {
                   etiqueta.isNotEmpty ? etiqueta : 'Beneficiario',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: tt.bodySmall?.copyWith(
-                    fontSize: 12,
+                  style: bar.textoChip.copyWith(
                     fontWeight: FontWeight.w700,
                     color: cs.onSurface,
                   ),
@@ -326,8 +386,8 @@ class _VacunasPageState extends State<VacunasPage> {
                 const SizedBox(width: AppEspaciado.sm),
                 Container(
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 6,
-                    vertical: 2,
+                    horizontal: AppEspaciado.sm,
+                    vertical: AppEspaciado.xs,
                   ),
                   decoration: BoxDecoration(
                     color: cs.tertiary.withValues(alpha: 0.15),
@@ -335,8 +395,7 @@ class _VacunasPageState extends State<VacunasPage> {
                   ),
                   child: Text(
                     'MENOR',
-                    style: tt.labelSmall?.copyWith(
-                      fontSize: 9,
+                    style: bar.etiquetaSeccion.copyWith(
                       fontWeight: FontWeight.w800,
                       color: cs.tertiary,
                     ),
@@ -368,7 +427,7 @@ class _VacunasPageState extends State<VacunasPage> {
     if (!requiere || yaCargado) return const SizedBox.shrink();
 
     final cs = Theme.of(context).colorScheme;
-    final tt = Theme.of(context).textTheme;
+    final bar = context.sisTipografia;
     return Material(
       color: cs.errorContainer.withValues(alpha: 0.35),
       child: InkWell(
@@ -396,8 +455,7 @@ class _VacunasPageState extends State<VacunasPage> {
                   'Menor de edad: falta cargar el tutor',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: tt.bodySmall?.copyWith(
-                    fontSize: 12,
+                  style: bar.textoChip.copyWith(
                     fontWeight: FontWeight.w700,
                     color: cs.error,
                   ),
@@ -423,6 +481,9 @@ class _VacunasPageState extends State<VacunasPage> {
     if (pasos == 6) {
       etiquetaAvance = 'Continuar';
       alAvanzar = _cargarLotesYAvanzar;
+    } else if (pasos == 7 && _fechaFueraDeRangoLotes) {
+      etiquetaAvance = 'Continuar';
+      alAvanzar = _confirmarLoteManual;
     } else if (pasos == 8) {
       etiquetaAvance = 'Registrar';
       alAvanzar = _registrando ? null : _alPresionarContinuarRegistro;
@@ -665,7 +726,7 @@ class _VacunasPageState extends State<VacunasPage> {
             child: const Text('Salir y buscar otra persona'),
           ),
         ],
-        textoBotonAlerta: 'Descartar esta vacuna',
+        textoBotonAlerta: 'Eliminar esta vacuna',
         funcion1: () {
           Navigator.of(dialogCtx).pop();
           reiniciarCicloVacuna();
@@ -729,7 +790,6 @@ class _VacunasPageState extends State<VacunasPage> {
 
   Widget vacunasAplicadas({ScrollController? scrollController}) {
     final cs = Theme.of(context).colorScheme;
-    final tt = Theme.of(context).textTheme;
     final bar = context.sisTipografia;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: AppEspaciado.lg),
@@ -755,165 +815,193 @@ class _VacunasPageState extends State<VacunasPage> {
           const SizedBox(height: AppEspaciado.xs),
           Text(
             'Beneficiario en pantalla · solo lectura',
-            style: tt.titleSmall?.copyWith(
-              fontSize: 13,
+            style: bar.textoSecundario.copyWith(
               fontWeight: FontWeight.w600,
               color: AppSuperficies.textoSecundario(context),
             ),
           ),
+          Container(
+            decoration: AppSuperficies.campoBusqueda(context),
+            clipBehavior: Clip.antiAlias,
+            child: TextField(
+              autocorrect: false,
+              controller: controladorBusquedaHistorialDosis,
+              keyboardType: TextInputType.text,
+              decoration: InputDecoration(
+                prefixIcon: Icon(
+                  Icons.search_rounded,
+                  color: cs.onSurfaceVariant,
+                ),
+                focusedBorder: InputBorder.none,
+                border: InputBorder.none,
+                hintText: 'Buscar vacuna…',
+                hintStyle: bar.textoDestacado.copyWith(
+                  fontWeight: FontWeight.w400,
+                  color: AppSuperficies.textoSecundario(context),
+                ),
+              ),
+            ),
+          ),
           const SizedBox(height: AppEspaciado.lg),
           Expanded(
-            child: ValueListenableBuilder<List<InsertRegistros>>(
-              valueListenable: insertRegistroService.visitaRegistrosEstado,
-              builder: (BuildContext context, visitaRegistros, _) {
-                return ValueListenableBuilder<List<NotificacionesDosis>>(
-                  valueListenable:
-                      notificacionesDosisService.listaDosisAplicadasEstado,
-                  builder: (BuildContext context, listaDosisAplicadas, _) {
-                    // Combina lo aplicado en esta visita (memoria, siempre al
-                    // día) con el historial bajado del backend, sin duplicar
-                    // si el backend ya llegó a reflejar el mismo registro
-                    // (mismo lote + dosis + fecha).
-                    final filasVisita = visitaRegistros
-                        .map(
-                          (r) => (
-                            titulo: '${r.nombreDosis} · ${r.nombreVacuna}',
-                            lote: r.nombreLote ?? '',
-                            fecha: r.fecha_aplicacion ?? '',
-                          ),
-                        )
-                        .toList();
-                    final filasHistorial = listaDosisAplicadas
-                        .map(
-                          (d) => (
-                            titulo:
-                                '${d.sysvacu05_nombre} · ${d.sysvacu04_nombre}',
-                            lote: d.sysdesa18_lote ?? '',
-                            fecha: d.sysdesa10_fecha_aplicacion ?? '',
-                          ),
-                        )
-                        .where(
-                          (fh) => !filasVisita.any(
-                            (fv) =>
-                                fv.titulo == fh.titulo &&
-                                fv.lote == fh.lote &&
-                                fv.fecha == fh.fecha,
-                          ),
-                        )
-                        .toList();
-                    final filas = [...filasVisita, ...filasHistorial];
-                    return filas.isNotEmpty
-                        ? ListView.builder(
-                            controller: scrollController,
-                            padding: const EdgeInsets.only(
-                              bottom: AppEspaciado.xl,
-                            ),
-                            itemCount: filas.length,
-                            itemBuilder: (BuildContext context, int index) {
-                              final fila = filas[index];
-                              return Padding(
-                                padding: const EdgeInsets.only(
-                                  bottom: AppEspaciado.sm,
+            child: ValueListenableBuilder<TextEditingValue>(
+              valueListenable: controladorBusquedaHistorialDosis,
+              builder: (BuildContext context, textoBusqueda, _) {
+                return ValueListenableBuilder<List<InsertRegistros>>(
+                  valueListenable: insertRegistroService.visitaRegistrosEstado,
+                  builder: (BuildContext context, visitaRegistros, _) {
+                    return ValueListenableBuilder<List<NotificacionesDosis>>(
+                      valueListenable:
+                          notificacionesDosisService.listaDosisAplicadasEstado,
+                      builder: (BuildContext context, historialCompleto, _) {
+                        // Única fuente del historial previo:
+                        // `wserv_listados_vacunas` (`vacunas_aplicadas`), la
+                        // misma que ya se consulta en cada carga de
+                        // beneficiario. `obtener_aplicaciones_beneficiario`
+                        // se dejó de usar acá: para el DNI 53790032 devolvía
+                        // solo 12 de las 42 aplicaciones reales.
+                        // Se combina con lo aplicado en esta visita (memoria,
+                        // siempre al día), sin duplicar si el backend ya
+                        // llegó a reflejar el mismo registro (misma dosis +
+                        // vacuna + fecha).
+                        final filasVisita = visitaRegistros
+                            .map(
+                              (r) => (
+                                titulo: '${r.nombreDosis} · ${r.nombreVacuna}',
+                                fecha: r.fecha_aplicacion ?? '',
+                              ),
+                            )
+                            .toList();
+                        final filasHistorial = historialCompleto
+                            .map(
+                              (d) => (
+                                titulo:
+                                    '${d.sysvacu05_nombre} · ${d.sysvacu04_nombre}',
+                                fecha: d.sysdesa10_fecha_aplicacion ?? '',
+                              ),
+                            )
+                            .where(
+                              (fh) => !filasVisita.any(
+                                (fv) =>
+                                    fv.titulo == fh.titulo &&
+                                    fv.fecha == fh.fecha,
+                              ),
+                            )
+                            .toList();
+                        final consulta = textoBusqueda.text
+                            .trim()
+                            .toLowerCase();
+                        final filas = [...filasVisita, ...filasHistorial]
+                            .where(
+                              (f) =>
+                                  consulta.isEmpty ||
+                                  f.titulo.toLowerCase().contains(consulta),
+                            )
+                            .toList();
+                        return filas.isNotEmpty
+                            ? ListView.builder(
+                                controller: scrollController,
+                                padding: EdgeInsets.only(
+                                  bottom:
+                                      AppEspaciado.xl +
+                                      MediaQuery.of(context).padding.bottom,
                                 ),
-                                child: Material(
-                                  color: cs.surfaceContainerHighest.withValues(
-                                    alpha: 0.55,
-                                  ),
-                                  elevation: 0,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(
-                                      AppEspaciado.radioCampo,
+                                itemCount: filas.length,
+                                itemBuilder: (BuildContext context, int index) {
+                                  final fila = filas[index];
+                                  return Padding(
+                                    padding: const EdgeInsets.only(
+                                      bottom: AppEspaciado.sm,
                                     ),
-                                    side: BorderSide(
-                                      color: cs.outlineVariant.withValues(
-                                        alpha: 0.38,
+                                    child: Material(
+                                      color: cs.surfaceContainerHighest
+                                          .withValues(alpha: 0.55),
+                                      elevation: 0,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(
+                                          AppEspaciado.radioCampo,
+                                        ),
+                                        side: BorderSide(
+                                          color: cs.outlineVariant.withValues(
+                                            alpha: 0.38,
+                                          ),
+                                        ),
+                                      ),
+                                      child: Padding(
+                                        padding: const EdgeInsets.all(
+                                          AppEspaciado.md,
+                                        ),
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              fila.titulo,
+                                              style: bar.textoDestacado.copyWith(
+                                                height: 1.25,
+                                                color: cs.onSurface,
+                                              ),
+                                            ),
+                                            const SizedBox(
+                                              height: AppEspaciado.sm,
+                                            ),
+                                            Text(
+                                              'Aplicación ${fila.fecha}',
+                                              style: bar.textoSecundario.copyWith(
+                                                color:
+                                                    AppSuperficies.textoSecundario(
+                                                      context,
+                                                    ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
                                       ),
                                     ),
+                                  );
+                                },
+                              )
+                            : Center(
+                                child: Padding(
+                                  padding: const EdgeInsets.all(
+                                    AppEspaciado.xl,
                                   ),
-                                  child: Padding(
-                                    padding: const EdgeInsets.all(
-                                      AppEspaciado.md,
-                                    ),
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          fila.titulo,
-                                          style: tt.titleSmall?.copyWith(
-                                            fontWeight: FontWeight.w700,
-                                            fontSize: 15,
-                                            height: 1.25,
-                                            color: cs.onSurface,
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(
+                                        Icons.vaccines_outlined,
+                                        size: AppTamanoIcono.extraGrande,
+                                        color: cs.onSurfaceVariant.withValues(
+                                          alpha: 0.65,
+                                        ),
+                                      ),
+                                      const SizedBox(height: AppEspaciado.md),
+                                      Text(
+                                        'Sin dosis registradas',
+                                        textAlign: TextAlign.center,
+                                        style: bar.subtituloTarjeta.copyWith(
+                                          fontWeight: FontWeight.w600,
+                                          color: cs.onSurface,
+                                        ),
+                                      ),
+                                      const SizedBox(height: AppEspaciado.sm),
+                                      Text(
+                                        'Cuando existan aplicaciones previas, aparecerán aquí.',
+                                        textAlign: TextAlign.center,
+                                        style: bar.textoPrincipal.copyWith(
+                                          height: 1.35,
+                                          color: AppSuperficies.textoSecundario(
+                                            context,
                                           ),
                                         ),
-                                        const SizedBox(height: AppEspaciado.sm),
-                                        Text(
-                                          'Lote ${fila.lote}',
-                                          style: tt.bodyMedium?.copyWith(
-                                            fontSize: 13,
-                                            color:
-                                                AppSuperficies.textoSecundario(
-                                                  context,
-                                                ),
-                                          ),
-                                        ),
-                                        Text(
-                                          'Aplicación ${fila.fecha}',
-                                          style: tt.bodyMedium?.copyWith(
-                                            fontSize: 13,
-                                            color:
-                                                AppSuperficies.textoSecundario(
-                                                  context,
-                                                ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
+                                      ),
+                                    ],
                                   ),
                                 ),
                               );
-                            },
-                          )
-                        : Center(
-                            child: Padding(
-                              padding: const EdgeInsets.all(AppEspaciado.xl),
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(
-                                    Icons.vaccines_outlined,
-                                    size: 52,
-                                    color: cs.onSurfaceVariant.withValues(
-                                      alpha: 0.65,
-                                    ),
-                                  ),
-                                  const SizedBox(height: AppEspaciado.md),
-                                  Text(
-                                    'Sin dosis registradas',
-                                    textAlign: TextAlign.center,
-                                    style: bar.subtituloTarjeta.copyWith(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.w600,
-                                      color: cs.onSurface,
-                                    ),
-                                  ),
-                                  const SizedBox(height: AppEspaciado.sm),
-                                  Text(
-                                    'Cuando existan aplicaciones previas, aparecerán aquí.',
-                                    textAlign: TextAlign.center,
-                                    style: tt.bodyMedium?.copyWith(
-                                      fontSize: 14,
-                                      height: 1.35,
-                                      color: AppSuperficies.textoSecundario(
-                                        context,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          );
+                      },
+                    );
                   },
                 );
               },
@@ -928,7 +1016,7 @@ class _VacunasPageState extends State<VacunasPage> {
     final cs = Theme.of(context).colorScheme;
     return BoxDecoration(
       color: cs.surfaceContainerLowest,
-      borderRadius: BorderRadius.circular(AppEspaciado.xl),
+      borderRadius: BorderRadius.circular(AppEspaciado.radioCampo),
       border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.35)),
       boxShadow: [
         BoxShadow(
@@ -950,8 +1038,6 @@ class _VacunasPageState extends State<VacunasPage> {
     required VoidCallback onAlternar,
   }) {
     final cs = Theme.of(context).colorScheme;
-    final tt = Theme.of(context).textTheme;
-    final bar = context.sisTipografia;
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -959,71 +1045,17 @@ class _VacunasPageState extends State<VacunasPage> {
         onTap: onAlternar,
         child: Padding(
           padding: const EdgeInsets.all(AppEspaciado.xs),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 4,
-                constraints: const BoxConstraints(minHeight: 52),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(AppEspaciado.xs),
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [cs.primary, cs.primary.withValues(alpha: 0.55)],
-                  ),
-                ),
-              ),
-              const SizedBox(width: 14),
-              Icon(icono, color: cs.primary, size: AppTamanoIcono.mediano),
-              const SizedBox(width: AppEspaciado.md),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      rol.toUpperCase(),
-                      style: tt.labelSmall?.copyWith(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 1.35,
-                        height: 1.2,
-                        color: cs.primary,
-                      ),
-                    ),
-                    const SizedBox(height: AppEspaciado.sm),
-                    Text(
-                      nombreDestacado,
-                      style: bar.tituloTarjeta.copyWith(
-                        fontSize: 23,
-                        height: 1.12,
-                        color: cs.onSurface,
-                      ),
-                    ),
-                    if (lineaContexto != null &&
-                        lineaContexto.trim().isNotEmpty) ...[
-                      const SizedBox(height: AppEspaciado.xs),
-                      Text(
-                        lineaContexto.trim(),
-                        style: tt.titleSmall?.copyWith(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          height: 1.25,
-                          color: cs.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-              Icon(
-                expandido
-                    ? Icons.expand_less_rounded
-                    : Icons.expand_more_rounded,
-                color: cs.onSurfaceVariant,
-                size: 28,
-              ),
-            ],
+          child: VacunasEncabezadoAcento(
+            icono: icono,
+            color: cs.primary,
+            etiqueta: rol,
+            titulo: nombreDestacado,
+            subtitulo: lineaContexto,
+            trailing: Icon(
+              expandido ? Icons.expand_less_rounded : Icons.expand_more_rounded,
+              color: cs.onSurfaceVariant,
+              size: 28,
+            ),
           ),
         ),
       ),
@@ -1039,6 +1071,7 @@ class _VacunasPageState extends State<VacunasPage> {
   }
 
   List<Widget> _filasDetalleBeneficiario(BuildContext context, Beneficiario b) {
+    final bar = context.sisTipografia;
     final filas = <Widget>[];
     void agregar(String etiqueta, String? valor, {bool ceroEsVacio = false}) {
       if (!_beneficiarioValorVisible(valor, ceroEsVacio: ceroEsVacio)) return;
@@ -1073,8 +1106,7 @@ class _VacunasPageState extends State<VacunasPage> {
       filas.add(
         Text(
           'Sin datos de identificación',
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-            fontSize: 14,
+          style: bar.textoPrincipal.copyWith(
             height: 1.35,
             color: AppSuperficies.textoSecundario(context),
           ),
@@ -1085,6 +1117,7 @@ class _VacunasPageState extends State<VacunasPage> {
   }
 
   List<Widget> _filasDetalleTutor(BuildContext context, Tutor t) {
+    final bar = context.sisTipografia;
     final filas = <Widget>[];
     void agregar(String etiqueta, String? valor) {
       if (!_beneficiarioValorVisible(valor)) return;
@@ -1103,8 +1136,7 @@ class _VacunasPageState extends State<VacunasPage> {
       filas.add(
         Text(
           'Sin datos del tutor',
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-            fontSize: 14,
+          style: bar.textoPrincipal.copyWith(
             height: 1.35,
             color: AppSuperficies.textoSecundario(context),
           ),
@@ -1146,6 +1178,7 @@ class _VacunasPageState extends State<VacunasPage> {
               sexoEsFemenino: sexoEsFemenino,
               condicion: condicion,
               esPersonalDeSalud: esPersonalDeSalud,
+              personalSaludEditable: false,
               onCondicionChanged: (c) =>
                   situacionBeneficiarioService.cargarSituacion(
                     condicionGestacional: c,
@@ -1173,7 +1206,7 @@ class _VacunasPageState extends State<VacunasPage> {
       builder: (BuildContext context, visita, _) {
         if (visita.isEmpty) return const SizedBox.shrink();
         final cs = Theme.of(context).colorScheme;
-        final tt = Theme.of(context).textTheme;
+        final bar = context.sisTipografia;
         return Padding(
           padding: const EdgeInsets.only(bottom: AppEspaciado.sm),
           child: Material(
@@ -1198,8 +1231,7 @@ class _VacunasPageState extends State<VacunasPage> {
                     Expanded(
                       child: Text(
                         '${visita.length} aplicada${visita.length == 1 ? '' : 's'} en esta visita',
-                        style: tt.bodySmall?.copyWith(
-                          fontSize: 12,
+                        style: bar.textoChip.copyWith(
                           fontWeight: FontWeight.w700,
                           color: cs.onSurfaceVariant,
                         ),
@@ -1222,7 +1254,7 @@ class _VacunasPageState extends State<VacunasPage> {
 
   Widget _filaDatoBeneficiario(String etiqueta, String valor) {
     final cs = Theme.of(context).colorScheme;
-    final tt = Theme.of(context).textTheme;
+    final bar = context.sisTipografia;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(
@@ -1241,8 +1273,7 @@ class _VacunasPageState extends State<VacunasPage> {
             flex: 12,
             child: Text(
               etiqueta,
-              style: tt.labelLarge?.copyWith(
-                fontSize: 12,
+              style: bar.textoChip.copyWith(
                 fontWeight: FontWeight.w700,
                 letterSpacing: 0.2,
                 height: 1.3,
@@ -1255,9 +1286,7 @@ class _VacunasPageState extends State<VacunasPage> {
             child: Text(
               valor,
               textAlign: TextAlign.end,
-              style: tt.titleSmall?.copyWith(
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
+              style: bar.textoDestacado.copyWith(
                 height: 1.35,
                 color: cs.onSurface,
               ),
@@ -1290,9 +1319,14 @@ class _VacunasPageState extends State<VacunasPage> {
     required String titulo,
     String? subtitulo,
     required VoidCallback onTap,
+    bool fueraDeLimite = false,
+    bool deshabilitado = false,
   }) {
     final cs = Theme.of(context).colorScheme;
-    final tt = Theme.of(context).textTheme;
+    final bar = context.sisTipografia;
+    final advertencia = cs.brightness == Brightness.dark
+        ? Colors.amber.shade300
+        : Colors.amber.shade800;
     return Padding(
       padding: const EdgeInsets.only(bottom: AppEspaciado.sm),
       child: Material(
@@ -1302,57 +1336,84 @@ class _VacunasPageState extends State<VacunasPage> {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppEspaciado.lg),
           side: BorderSide(
-            color: seleccionado
+            color: fueraDeLimite
+                ? advertencia
+                : seleccionado
                 ? cs.primary
                 : cs.outlineVariant.withValues(alpha: 0.4),
-            width: seleccionado ? 1.5 : 1,
+            width: seleccionado || fueraDeLimite ? 1.5 : 1,
           ),
         ),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(AppEspaciado.lg),
-          onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppEspaciado.md,
-              vertical: AppEspaciado.md,
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        titulo,
-                        style: tt.titleSmall?.copyWith(
-                          fontWeight: seleccionado
-                              ? FontWeight.w800
-                              : FontWeight.w600,
-                          fontSize: 15,
-                          height: 1.25,
-                          color: cs.onSurface,
-                        ),
-                      ),
-                      if (subtitulo != null) ...[
-                        const SizedBox(height: AppEspaciado.xs),
+        child: Opacity(
+          opacity: deshabilitado ? 0.5 : 1,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(AppEspaciado.lg),
+            onTap: onTap,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppEspaciado.md,
+                vertical: AppEspaciado.md,
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
                         Text(
-                          subtitulo,
-                          style: tt.bodySmall?.copyWith(
-                            fontSize: 12,
-                            color: AppSuperficies.textoSecundario(context),
+                          titulo,
+                          style: bar.textoDestacado.copyWith(
+                            fontWeight: seleccionado
+                                ? FontWeight.w800
+                                : FontWeight.w600,
+                            height: 1.25,
+                            color: cs.onSurface,
                           ),
                         ),
+                        if (subtitulo != null) ...[
+                          const SizedBox(height: AppEspaciado.xs),
+                          Text(
+                            subtitulo,
+                            style: bar.textoChip.copyWith(
+                              fontWeight: FontWeight.w400,
+                              color: AppSuperficies.textoSecundario(context),
+                            ),
+                          ),
+                        ],
+                        if (fueraDeLimite) ...[
+                          const SizedBox(height: AppEspaciado.xs),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.warning_amber_rounded,
+                                size: 14,
+                                color: advertencia,
+                              ),
+                              const SizedBox(width: AppEspaciado.xs),
+                              Text(
+                                'Fuera de límite',
+                                style: bar.etiquetaSeccion.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                  color: advertencia,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                       ],
-                    ],
+                    ),
                   ),
-                ),
-                Icon(
-                  Icons.chevron_right_rounded,
-                  color: seleccionado
-                      ? cs.primary
-                      : cs.onSurfaceVariant.withValues(alpha: 0.45),
-                ),
-              ],
+                  Icon(
+                    deshabilitado
+                        ? Icons.lock_outline_rounded
+                        : Icons.chevron_right_rounded,
+                    color: seleccionado
+                        ? cs.primary
+                        : cs.onSurfaceVariant.withValues(alpha: 0.45),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -1403,7 +1464,12 @@ class _VacunasPageState extends State<VacunasPage> {
                     from: 14,
                     duration: const Duration(milliseconds: 380),
                     child: Padding(
-                      padding: const EdgeInsets.fromLTRB(18, 18, 14, 12),
+                      padding: const EdgeInsets.fromLTRB(
+                        AppEspaciado.lg,
+                        AppEspaciado.lg,
+                        AppEspaciado.md,
+                        AppEspaciado.md,
+                      ),
                       child: _encabezadoIdentidadColapsable(
                         icono: Icons.family_restroom_outlined,
                         rol: 'Tutor o responsable',
@@ -1420,7 +1486,12 @@ class _VacunasPageState extends State<VacunasPage> {
                   ),
                   if (mostrarTutor)
                     Padding(
-                      padding: const EdgeInsets.fromLTRB(18, 0, 18, 18),
+                      padding: const EdgeInsets.fromLTRB(
+                        AppEspaciado.lg,
+                        0,
+                        AppEspaciado.lg,
+                        AppEspaciado.lg,
+                      ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
@@ -1492,7 +1563,7 @@ class _VacunasPageState extends State<VacunasPage> {
   /// Sin perfiles: mensaje claro y reintentar.
   Widget _vacunasPaso1SinPerfiles() {
     final cs = Theme.of(context).colorScheme;
-    final tt = Theme.of(context).textTheme;
+    final bar = context.sisTipografia;
     final detalle = perfilesVacunacionService.mensajeListaPerfilesVacia;
     final texto =
         detalle ??
@@ -1519,8 +1590,8 @@ class _VacunasPageState extends State<VacunasPage> {
               Text(
                 texto,
                 textAlign: TextAlign.center,
-                style: tt.bodyLarge?.copyWith(
-                  fontSize: 15,
+                style: bar.textoDestacado.copyWith(
+                  fontWeight: FontWeight.w400,
                   height: 1.4,
                   color: Theme.of(context).colorScheme.onSurface,
                 ),
@@ -1557,6 +1628,38 @@ class _VacunasPageState extends State<VacunasPage> {
     }
   }
 
+  /// Reintento de la vía "Pendientes": misma llamada que ya repuebla el
+  /// historial y `vacunasPendientesService` (`_refrescarHistorialDosis`).
+  /// Si el servidor responde bien, `marcarError` se limpia solo dentro de
+  /// `cargarListaPendientes`.
+  Future<void> _reintentarCargaPendientes() async {
+    setState(() => _recargandoPendientes = true);
+    await _refrescarHistorialDosis();
+    if (mounted) setState(() => _recargandoPendientes = false);
+  }
+
+  /// La vía "pendientes" reutiliza los pasos compartidos del wizard
+  /// "por perfil" (7=Lote, 8=Confirmar) pero saltando directo del paso 1 a
+  /// Lote — no pasa por Fecha (6): la fecha de aplicación siempre es la del
+  /// momento del registro, no editable. Son solo 3 pasos reales, no 8.
+  /// Mapeo único de paso real -> posición mostrada, para no repetir esta
+  /// cuenta en cada lugar que muestra "PASO X" (header, títulos de sección,
+  /// navegación).
+  int _pasoMostradoPendientes(int pasoReal) {
+    const mapa = {1: 1, 7: 2, 8: 3};
+    return mapa[pasoReal] ?? pasoReal;
+  }
+
+  /// Etiqueta "PASO X" para los pasos 6/7/8, compartidos entre las dos vías:
+  /// en 'pendientes' usa la numeración de 4 pasos; en 'perfil', la de 8 tal
+  /// cual estaba (sin sufijo "DE 8", como el resto de los títulos de paso).
+  String _etiquetaPasoCompartido(int pasoReal) {
+    if (_modoRegistro == 'pendientes') {
+      return 'PASO ${_pasoMostradoPendientes(pasoReal)} DE 4';
+    }
+    return 'PASO $pasoReal';
+  }
+
   /// Bifurcación previa al paso 1: elegir la vía de registro. 'perfil' sigue
   /// el wizard actual (perfil → vacuna → condición → ...); 'pendientes' usa
   /// el listado de `wserv_listados_vacunas.php` (aún sin conectar).
@@ -1582,15 +1685,219 @@ class _VacunasPageState extends State<VacunasPage> {
         ),
         const SizedBox(height: AppEspaciado.md),
         _modoRegistro == 'pendientes'
-            ? _placeholderVacunasPendientes()
+            ? _listaVacunasPendientes()
             : containerPerfiles(),
       ],
     );
   }
 
-  /// Placeholder de la vía "Pendientes": todavía no está conectado a
-  /// `wserv_listados_vacunas.php`. Solo diferencia la vía visualmente.
-  Widget _placeholderVacunasPendientes() {
+  /// Vía "Pendientes": lee `vacunas_pendientes` de `wserv_listados_vacunas.php`
+  /// (ya bajado junto con el historial al cargar el beneficiario, ver
+  /// `vacunasPendientesService`). Al tocar una, precarga vacuna/condición/
+  /// esquema/dosis con los datos que ya trae el pendiente y salta directo al
+  /// paso 6 (Fecha) — esa combinación ya viene resuelta, no hace falta
+  /// repreguntarla.
+  Widget _listaVacunasPendientes() {
+    return ValueListenableBuilder<String?>(
+      valueListenable: vacunasPendientesService.mensajeErrorEstado,
+      builder: (BuildContext context, mensajeError, _) {
+        return ValueListenableBuilder<List<VacunaPendiente>>(
+          valueListenable: vacunasPendientesService.listaPendientesEstado,
+          builder: (BuildContext context, lista, _) =>
+              _contenidoListaPendientes(lista, mensajeError),
+        );
+      },
+    );
+  }
+
+  Widget _contenidoListaPendientes(
+    List<VacunaPendiente> listaCompleta,
+    String? mensajeError,
+  ) {
+    if (_recargandoPendientes || _cargandoLotePendiente) {
+      return const LoadingEstrellas();
+    }
+    // Fuera de límite (aplicacion_dentro_limite == 0) no se ofrece para
+    // registrar desde acá: no bloquea la vía "Vacuna" (paso 2), solo esta
+    // lista de pendientes.
+    final lista = listaCompleta
+        .where((p) => p.aplicacion_dentro_limite != 0)
+        .toList();
+    if (lista.isEmpty) {
+      // Distingue "está al día" (sin mensaje de error) de "no se pudo
+      // consultar" (con mensaje): en este último caso no hay que decirle al
+      // operador que no tiene nada pendiente, sino dejarlo reintentar.
+      if (mensajeError != null) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _avisoPendientes(mensajeError, Icons.wifi_off_rounded),
+            const SizedBox(height: AppEspaciado.md),
+            OutlinedButton.icon(
+              style: AppBotones.estiloOutlinedSecundario(),
+              onPressed: _reintentarCargaPendientes,
+              icon: const Icon(Icons.refresh_rounded),
+              label: const Text('Reintentar'),
+            ),
+          ],
+        );
+      }
+      return _avisoPendientes(
+        'No hay vacunas pendientes registradas para esta persona.',
+        Icons.check_circle_outline,
+      );
+    }
+    // Agrupadas por vacuna y con sus dosis consecutivas en orden (1ra, 2da,
+    // 3er... Refuerzo al final).
+    final ordenada = [...lista]
+      ..sort((a, b) {
+        final vacunaA = (a.sysvacu04_nombre ?? '').toLowerCase();
+        final vacunaB = (b.sysvacu04_nombre ?? '').toLowerCase();
+        final comparacionVacuna = vacunaA.compareTo(vacunaB);
+        if (comparacionVacuna != 0) return comparacionVacuna;
+        final ordenA = _ordenDosisPendiente(a.sysvacu05_nombre) ?? 0;
+        final ordenB = _ordenDosisPendiente(b.sysvacu05_nombre) ?? 0;
+        return ordenA.compareTo(ordenB);
+      });
+    final consulta = controladorBusquedaVacunas.text.trim().toLowerCase();
+    final filtrada = consulta.isEmpty
+        ? ordenada
+        : ordenada
+              .where(
+                (p) =>
+                    (p.sysvacu04_nombre ?? '').toLowerCase().contains(consulta),
+              )
+              .toList();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Container(
+          decoration: AppSuperficies.campoBusqueda(context),
+          clipBehavior: Clip.antiAlias,
+          child: TextField(
+            autocorrect: false,
+            controller: controladorBusquedaVacunas,
+            keyboardType: TextInputType.text,
+            decoration: InputDecoration(
+              prefixIcon: Icon(
+                Icons.search_rounded,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+              focusedBorder: InputBorder.none,
+              border: InputBorder.none,
+              hintText: 'Buscar vacuna…',
+              hintStyle: context.sisTipografia.textoDestacado.copyWith(
+                fontWeight: FontWeight.w400,
+                color: AppSuperficies.textoSecundario(context),
+              ),
+            ),
+            onChanged: (_) => setState(() {}),
+          ),
+        ),
+        const SizedBox(height: AppEspaciado.md),
+        SwitchListTile.adaptive(
+          contentPadding: EdgeInsets.zero,
+          dense: true,
+          value: _validarOrdenDosis,
+          onChanged: (v) => setState(() => _validarOrdenDosis = v),
+          title: Text(
+            'Controlar orden de dosis',
+            style: context.sisTipografia.textoSecundario.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          subtitle: Text(
+            'Bloquea una dosis si la anterior de esa vacuna sigue pendiente',
+            style: context.sisTipografia.etiquetaSeccion.copyWith(
+              letterSpacing: 0,
+              fontWeight: FontWeight.w400,
+            ),
+          ),
+        ),
+        const SizedBox(height: AppEspaciado.sm),
+        if (filtrada.isEmpty)
+          _avisoPendientes(
+            'No hay vacunas pendientes que coincidan con "$consulta".',
+            Icons.search_off_rounded,
+          ),
+        ...filtrada.map((p) {
+          final seleccionado =
+              _selectVacunas?.id_sysvacu04 == p.rela_sysvacu04 &&
+              _selectDosis?.id_sysvacu05 == p.rela_sysvacu05;
+          final bloqueada = _dosisBloqueadaPorOrden(p, lista);
+          return _tarjetaOpcionFila(
+            seleccionado: seleccionado,
+            titulo: p.sysvacu04_nombre ?? 'Vacuna',
+            subtitulo: [
+              if ((p.sysvacu05_nombre ?? '').isNotEmpty) p.sysvacu05_nombre!,
+              if ((p.sysvacu01_descripcion ?? '').isNotEmpty)
+                p.sysvacu01_descripcion!,
+            ].join(' · '),
+            deshabilitado: bloqueada,
+            onTap: bloqueada
+                ? () => _avisarDosisBloqueada(p)
+                : () => _seleccionarPendiente(p),
+          );
+        }),
+        if (filtrada.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: AppEspaciado.xs),
+            child: Align(
+              alignment: Alignment.centerRight,
+              child: Text(
+                '${filtrada.length} '
+                '${filtrada.length == 1 ? 'vacuna' : 'vacunas'}',
+                style: context.sisTipografia.etiquetaSeccion.copyWith(
+                  letterSpacing: 0,
+                  fontWeight: FontWeight.w400,
+                  color: AppSuperficies.textoSecundario(context),
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  /// Orden de una dosis a partir de su nombre ("1ra Dosis" -> 1, "Refuerzo"
+  /// -> orden alto, después de cualquier dosis numerada). "Unica Dosis" no
+  /// tiene dosis previa, no se evalúa.
+  int? _ordenDosisPendiente(String? nombre) {
+    final n = (nombre ?? '').toLowerCase();
+    if (n.contains('unica')) return null;
+    final match = RegExp(r'(\d+)').firstMatch(n);
+    if (match != null) return int.parse(match.group(1)!);
+    if (n.contains('refuerzo')) return 999;
+    return null;
+  }
+
+  /// true si, con el switch activado, existe otra dosis pendiente de la
+  /// misma vacuna con orden menor (todavía no aplicada).
+  bool _dosisBloqueadaPorOrden(VacunaPendiente p, List<VacunaPendiente> lista) {
+    if (!_validarOrdenDosis) return false;
+    final orden = _ordenDosisPendiente(p.sysvacu05_nombre);
+    if (orden == null) return false;
+    return lista.any((o) {
+      if (o.rela_sysvacu04 != p.rela_sysvacu04) return false;
+      if (o.rela_sysvacu05 == p.rela_sysvacu05) return false;
+      final ordenOtra = _ordenDosisPendiente(o.sysvacu05_nombre);
+      return ordenOtra != null && ordenOtra < orden;
+    });
+  }
+
+  void _avisarDosisBloqueada(VacunaPendiente p) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Falta aplicar una dosis anterior de ${p.sysvacu04_nombre ?? 'esta vacuna'} '
+          'antes de registrar "${p.sysvacu05_nombre}". '
+          'Podés desactivar "Controlar orden de dosis" para forzarlo.',
+        ),
+      ),
+    );
+  }
+
+  Widget _avisoPendientes(String texto, IconData icono) {
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
     return Container(
@@ -1604,15 +1911,47 @@ class _VacunasPageState extends State<VacunasPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(Icons.construction_rounded, color: cs.onSurfaceVariant),
+          Icon(icono, color: cs.onSurfaceVariant),
           const SizedBox(height: AppEspaciado.sm),
           Text(
-            'Listado de vacunas pendientes en construcción.',
+            texto,
             style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
           ),
         ],
       ),
     );
+  }
+
+  /// Vía "Pendientes": no pasa por el paso de Fecha (6), no editable acá —
+  /// siempre la fecha del momento del registro. Dispara `_cargarLotesYAvanzar`
+  /// (misma validación de lotes que la vía "por perfil") en vez de solo
+  /// cambiar `pasos`, así también contempla vacunas con fecha < 1/1/2025 sin
+  /// lotes registrados. Mientras carga, `_contenidoListaPendientes` muestra
+  /// el spinner en lugar de la lista.
+  Future<void> _seleccionarPendiente(VacunaPendiente p) async {
+    listaLotes!.clear();
+    setState(() {
+      _selectVacunas = VacunasxPerfil(
+        id_sysvacu04: p.rela_sysvacu04,
+        sysvacu04_nombre: p.sysvacu04_nombre,
+      );
+      _selectCondicion = VacunasCondicion(
+        id_sysvacu01: p.rela_sysvacu01,
+        sysvacu01_descripcion: p.sysvacu01_descripcion,
+      );
+      _selectEsquema = VacunasEsquema(
+        id_sysvacu02: p.rela_sysvacu02,
+        sysvacu02_descripcion: p.sysvacu02_descripcion,
+      );
+      _selectDosis = VacunasDosis(
+        id_sysvacu05: p.rela_sysvacu05,
+        sysvacu05_nombre: p.sysvacu05_nombre,
+      );
+      _selectFecha = DateTime.now();
+      _cargandoLotePendiente = true;
+    });
+    await _cargarLotesYAvanzar();
+    if (mounted) setState(() => _cargandoLotePendiente = false);
   }
 
   Widget containerPerfiles() {
@@ -1646,43 +1985,61 @@ class _VacunasPageState extends State<VacunasPage> {
                     loadingLoginService.cargaPerfil(true);
                     listaLotes!.clear();
                     setState(() {
-                      _selectVacunas = null;
                       _selectPerfil = perfil;
+                      // Cambiar de perfil invalida toda la selección
+                      // posterior: si no se limpia, el header puede seguir
+                      // mostrando (y dejando tocar) chips de Condición/
+                      // Esquema/Dosis/Lote de la vacuna anterior.
+                      _limpiarDesdePaso(2);
                     });
                     // Perfil de la visita: se hereda en la próxima vacuna de
                     // la misma persona (ver _heredarPerfilDeLaVisita).
                     perfilesVacunacionService.cargarPerfilesVacu(perfil);
-                    final tempLista = await vacunasxPerfiles
-                        .obtenerVacunasxPerfilesProviders(
-                          _selectPerfil!.id_sysvacu12,
-                          beneficiarioService.beneficiario!.sysdesa10_dni,
-                          beneficiarioService.beneficiario!.sysdesa10_sexo,
+                    try {
+                      final tempLista = await vacunasxPerfiles
+                          .obtenerVacunasxPerfilesProviders(
+                            perfil.id_sysvacu12,
+                            beneficiarioService.beneficiario!.sysdesa10_dni,
+                            beneficiarioService.beneficiario!.sysdesa10_sexo,
+                          );
+                      if (!mounted) return;
+                      // `obtenerVacunasxPerfilesProviders` solo devuelve
+                      // `null` (cargó bien) o `0` (int, sin vacunas
+                      // configuradas) — nunca una `List`.
+                      if (tempLista == 0) {
+                        showDialog(
+                          context: _scaffoldKey.currentContext!,
+                          builder: (dialogCtx) => DialogoAlerta(
+                            envioFuncion2: false,
+                            envioFuncion1: false,
+                            tituloAlerta: 'Sin vacunas configuradas',
+                            descripcionAlerta:
+                                'El perfil "${perfil.sysvacu12_descripcion}" no tiene vacunas configuradas.',
+                            textoBotonAlerta: 'Listo',
+                            icon: const Icon(Icons.error_outline, size: 40),
+                            color: Theme.of(dialogCtx).colorScheme.error,
+                          ),
                         );
-                    if (!mounted) return;
-                    // `obtenerVacunasxPerfilesProviders` devuelve `0` (int)
-                    // cuando el perfil no tiene vacunas configuradas — no una
-                    // `List`. Guardia de tipo antes de indexar.
-                    if (tempLista is List &&
-                        tempLista.isNotEmpty &&
-                        tempLista[0].codigo_mensaje == "0") {
+                      } else {
+                        setState(() => pasos++);
+                      }
+                    } catch (_) {
+                      if (!mounted) return;
                       showDialog(
                         context: _scaffoldKey.currentContext!,
                         builder: (dialogCtx) => DialogoAlerta(
                           envioFuncion2: false,
                           envioFuncion1: false,
-                          tituloAlerta:
-                              'No se pudieron cargar las vacunas del perfil',
-                          descripcionAlerta: tempLista[0].mensaje,
+                          tituloAlerta: 'Sin conexión',
+                          descripcionAlerta:
+                              'No se pudieron cargar las vacunas del perfil. Revise la red e intente de nuevo.',
                           textoBotonAlerta: 'Listo',
-                          icon: const Icon(Icons.error_outline, size: 40),
+                          icon: const Icon(Icons.wifi_off_rounded, size: 40),
                           color: Theme.of(dialogCtx).colorScheme.error,
                         ),
                       );
-                    } else {
-                      loadingLoginService.cargaPerfil(false);
-                      if (tempLista == null) {
-                        setState(() => pasos++);
-                      }
+                    } finally {
+                      if (mounted) loadingLoginService.cargaPerfil(false);
                     }
                   },
                 );
@@ -1694,130 +2051,205 @@ class _VacunasPageState extends State<VacunasPage> {
     );
   }
 
+  /// Limpia las selecciones de los pasos posteriores a [pasoDestino] (2 a 7)
+  /// al volver atrás en el wizard (header, "Cambiar", elegir un perfil o una
+  /// vacuna distintos). Evita que un chip viejo (p. ej. Esquema/Dosis/Lote
+  /// de la vacuna anterior) quede visible y tocable junto a una selección
+  /// nueva, mezclando datos de dos vacunas distintas en el registro.
+  void _limpiarDesdePaso(int pasoDestino) {
+    if (pasoDestino <= 1) _selectVacunas = null;
+    if (pasoDestino <= 2) _selectCondicion = null;
+    if (pasoDestino <= 3) _selectEsquema = null;
+    if (pasoDestino <= 4) _selectDosis = null;
+    if (pasoDestino <= 5) {
+      _selectLote = null;
+      listaLotes!.clear();
+      controladorLoteManual.clear();
+    }
+  }
+
+  /// Antes del 1/1/2025 no se registró el lote de cada aplicación: no hay
+  /// nada que listar. En vez de la lista de lotes, se habilita un input
+  /// manual (serie del lote si el operador la tiene, "0" por defecto si no).
+  bool get _fechaFueraDeRangoLotes =>
+      _selectFecha.isBefore(DateTime(2025, 1, 1));
+
   /// Paso 2 — seleccionar vacuna y avanzar al paso de condición.
   Future<void> _seleccionarVacuna(VacunasxPerfil v) async {
-    listaLotes!.clear();
     setState(() {
-      _selectCondicion = null;
       _selectVacunas = v;
+      _limpiarDesdePaso(2);
       controladorBusqueda.clear();
     });
-    final ben = beneficiarioService.beneficiario!;
-    final edadEscaneo = beneficiarioService.edadAniosDesdePdf417Escaneado
-        ?.trim();
-    final edadParam = (edadEscaneo != null && edadEscaneo.isNotEmpty)
-        ? edadEscaneo
-        : (ben.sysdesa10_edad?.trim().isNotEmpty == true
-              ? ben.sysdesa10_edad!.trim()
-              : '');
-    final tempLista = await vacunasRepository.obtenerCondicionesProviders(
-      _selectVacunas!.id_sysvacu04,
-      edadParam.isNotEmpty ? edadParam : ben.sysdesa10_edad,
-    );
-    if (!mounted) return;
-    if (tempLista[0].codigo_mensaje == "0") {
+    try {
+      final ben = beneficiarioService.beneficiario!;
+      final edadEscaneo = beneficiarioService.edadAniosDesdePdf417Escaneado
+          ?.trim();
+      final edadParam = (edadEscaneo != null && edadEscaneo.isNotEmpty)
+          ? edadEscaneo
+          : (ben.sysdesa10_edad?.trim().isNotEmpty == true
+                ? ben.sysdesa10_edad!.trim()
+                : '');
+      final tempLista = await vacunasRepository.obtenerCondicionesProviders(
+        _selectVacunas!.id_sysvacu04,
+        edadParam.isNotEmpty ? edadParam : ben.sysdesa10_edad,
+      );
+      if (!mounted) return;
+      if (tempLista[0].codigo_mensaje == "0") {
+        showDialog(
+          context: _scaffoldKey.currentContext!,
+          builder: (dialogCtx) => DialogoAlerta(
+            envioFuncion2: false,
+            envioFuncion1: false,
+            tituloAlerta: 'No se pudieron cargar las condiciones',
+            descripcionAlerta: tempLista[0].mensaje,
+            textoBotonAlerta: 'Listo',
+            icon: const Icon(Icons.error_outline, size: 40),
+            color: Theme.of(dialogCtx).colorScheme.error,
+          ),
+        );
+      } else {
+        if (loadingLoginService.getLoadingCondicionState!) {
+          mostrarLoadingEstrellasXTiempo(context, 800);
+        }
+        setState(() {
+          listaCondiciones = tempLista;
+          vacunasCondicionService.cargarListaVacunasCondicion(tempLista);
+          pasos++;
+        });
+      }
+    } catch (_) {
+      if (!mounted) return;
       showDialog(
         context: _scaffoldKey.currentContext!,
         builder: (dialogCtx) => DialogoAlerta(
           envioFuncion2: false,
           envioFuncion1: false,
-          tituloAlerta: 'No se pudieron cargar las condiciones',
-          descripcionAlerta: tempLista[0].mensaje,
+          tituloAlerta: 'Sin conexión',
+          descripcionAlerta:
+              'No se pudieron cargar las condiciones. Revise la red e intente de nuevo.',
           textoBotonAlerta: 'Listo',
-          icon: const Icon(Icons.error_outline, size: 40),
+          icon: const Icon(Icons.wifi_off_rounded, size: 40),
           color: Theme.of(dialogCtx).colorScheme.error,
         ),
       );
-    } else {
-      if (loadingLoginService.getLoadingCondicionState!) {
-        mostrarLoadingEstrellasXTiempo(context, 800);
-      }
-      loadingLoginService.cargarCondicion(false);
-      setState(() {
-        listaCondiciones = tempLista;
-        vacunasCondicionService.cargarListaVacunasCondicion(tempLista);
-        pasos++;
-      });
+    } finally {
+      // Pase lo que pase, apaga el spinner: si no, paso 3 queda colgado.
+      if (mounted) loadingLoginService.cargarCondicion(false);
     }
   }
 
   /// Paso 3 — seleccionar condición y avanzar al paso de esquema.
   Future<void> _seleccionarCondicion(VacunasCondicion cond) async {
-    listaLotes!.clear();
     listaEsquemas!.clear();
     setState(() {
-      _selectEsquema = null;
       _selectCondicion = cond;
+      _limpiarDesdePaso(3);
       controladorBusquedaCondicion.clear();
     });
-    final tempLista = await vacunasRepository.obtenerEsquemasProviders(
-      _selectVacunas!.id_sysvacu04!,
-      _selectCondicion!.id_sysvacu01,
-    );
-    if (!mounted) return;
-    if (tempLista[0].codigo_mensaje == "0") {
+    try {
+      final tempLista = await vacunasRepository.obtenerEsquemasProviders(
+        _selectVacunas!.id_sysvacu04!,
+        _selectCondicion!.id_sysvacu01,
+      );
+      if (!mounted) return;
+      if (tempLista[0].codigo_mensaje == "0") {
+        showDialog(
+          context: _scaffoldKey.currentContext!,
+          builder: (dialogCtx) => DialogoAlerta(
+            envioFuncion2: false,
+            envioFuncion1: false,
+            tituloAlerta: 'No se pudieron cargar los esquemas',
+            descripcionAlerta: tempLista[0].mensaje,
+            textoBotonAlerta: 'Listo',
+            icon: const Icon(Icons.error_outline, size: 40),
+            color: Theme.of(dialogCtx).colorScheme.error,
+          ),
+        );
+      } else {
+        if (loadingLoginService.getLoadingEsquemaState!) {
+          mostrarLoadingEstrellasXTiempo(context, 800);
+        }
+        setState(() {
+          listaEsquemas = tempLista;
+          vacunasEsquemaService.cargarListavacunasEsquema(tempLista);
+          pasos++;
+        });
+      }
+    } catch (_) {
+      if (!mounted) return;
       showDialog(
         context: _scaffoldKey.currentContext!,
         builder: (dialogCtx) => DialogoAlerta(
           envioFuncion2: false,
           envioFuncion1: false,
-          tituloAlerta: 'No se pudieron cargar los esquemas',
-          descripcionAlerta: tempLista[0].mensaje,
+          tituloAlerta: 'Sin conexión',
+          descripcionAlerta:
+              'No se pudieron cargar los esquemas. Revise la red e intente de nuevo.',
           textoBotonAlerta: 'Listo',
-          icon: const Icon(Icons.error_outline, size: 40),
+          icon: const Icon(Icons.wifi_off_rounded, size: 40),
           color: Theme.of(dialogCtx).colorScheme.error,
         ),
       );
-    } else {
-      if (loadingLoginService.getLoadingEsquemaState!) {
-        mostrarLoadingEstrellasXTiempo(context, 800);
-      }
-      loadingLoginService.cargarEsquema(false);
-      setState(() {
-        listaEsquemas = tempLista;
-        vacunasEsquemaService.cargarListavacunasEsquema(tempLista);
-        pasos++;
-      });
+    } finally {
+      if (mounted) loadingLoginService.cargarEsquema(false);
     }
   }
 
   /// Paso 4 — seleccionar esquema y avanzar al paso de dosis.
   Future<void> _seleccionarEsquema(VacunasEsquema esq) async {
-    listaLotes!.clear();
     setState(() {
-      _selectDosis = null;
       _selectEsquema = esq;
+      _limpiarDesdePaso(4);
       controladorBusquedaEsquema.clear();
     });
-    final tempLista = await vacunasRepository.obtenerDosisProviders(
-      _selectVacunas!.id_sysvacu04!,
-      _selectCondicion!.id_sysvacu01!,
-      _selectEsquema!.id_sysvacu02!,
-    );
-    if (!mounted) return;
-    if (tempLista[0].codigo_mensaje == "0") {
+    try {
+      final tempLista = await vacunasRepository.obtenerDosisProviders(
+        _selectVacunas!.id_sysvacu04!,
+        _selectCondicion!.id_sysvacu01!,
+        _selectEsquema!.id_sysvacu02!,
+      );
+      if (!mounted) return;
+      if (tempLista[0].codigo_mensaje == "0") {
+        showDialog(
+          context: _scaffoldKey.currentContext!,
+          builder: (dialogCtx) => DialogoAlerta(
+            envioFuncion2: false,
+            envioFuncion1: false,
+            tituloAlerta: 'No se pudieron cargar las dosis',
+            descripcionAlerta: tempLista[0].mensaje,
+            textoBotonAlerta: 'Listo',
+            icon: const Icon(Icons.error_outline, size: 40),
+            color: Theme.of(dialogCtx).colorScheme.error,
+          ),
+        );
+      } else {
+        if (loadingLoginService.getLoadingDosisState!) {
+          mostrarLoadingEstrellasXTiempo(context, 800);
+        }
+        setState(() {
+          listaDosis = tempLista;
+          vacunasDosisService.cargarListaVacunasDosis(tempLista);
+          pasos++;
+        });
+      }
+    } catch (_) {
+      if (!mounted) return;
       showDialog(
         context: _scaffoldKey.currentContext!,
         builder: (dialogCtx) => DialogoAlerta(
           envioFuncion2: false,
           envioFuncion1: false,
-          tituloAlerta: 'No se pudieron cargar las dosis',
-          descripcionAlerta: tempLista[0].mensaje,
+          tituloAlerta: 'Sin conexión',
+          descripcionAlerta:
+              'No se pudieron cargar las dosis. Revise la red e intente de nuevo.',
           textoBotonAlerta: 'Listo',
-          icon: const Icon(Icons.error_outline, size: 40),
+          icon: const Icon(Icons.wifi_off_rounded, size: 40),
           color: Theme.of(dialogCtx).colorScheme.error,
         ),
       );
-    } else {
-      if (loadingLoginService.getLoadingDosisState!) {
-        mostrarLoadingEstrellasXTiempo(context, 800);
-      }
-      loadingLoginService.cargarDosis(false);
-      setState(() {
-        listaDosis = tempLista;
-        vacunasDosisService.cargarListaVacunasDosis(tempLista);
-        pasos++;
-      });
+    } finally {
+      if (mounted) loadingLoginService.cargarDosis(false);
     }
   }
 
@@ -1826,7 +2258,7 @@ class _VacunasPageState extends State<VacunasPage> {
       valueListenable: loadingLoginService.cargaPerfilEstado,
       builder: (BuildContext context, cargaPerfil, _) {
         return cargaPerfil
-            ? const SizedBox.shrink()
+            ? const LoadingEstrellas()
             : ValueListenableBuilder<List<VacunasxPerfil>>(
                 valueListenable:
                     vacunasxPerfilService.listavacunasxperfilEstado,
@@ -1852,11 +2284,13 @@ class _VacunasPageState extends State<VacunasPage> {
   }
 
   Widget _listaVacunasPorPerfil(List<VacunasxPerfil> listaVacunasxPerfil) {
+    final bar = context.sisTipografia;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Container(
           decoration: AppSuperficies.campoBusqueda(context),
+          clipBehavior: Clip.antiAlias,
           child: TextField(
             autocorrect: false,
             controller: controladorBusqueda,
@@ -1869,8 +2303,8 @@ class _VacunasPageState extends State<VacunasPage> {
               focusedBorder: InputBorder.none,
               border: InputBorder.none,
               hintText: 'Buscar vacuna…',
-              hintStyle: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                fontSize: 15,
+              hintStyle: bar.textoDestacado.copyWith(
+                fontWeight: FontWeight.w400,
                 color: AppSuperficies.textoSecundario(context),
               ),
             ),
@@ -1935,11 +2369,12 @@ class _VacunasPageState extends State<VacunasPage> {
   }
 
   Widget containerCondiciones() {
+    final bar = context.sisTipografia;
     return ValueListenableBuilder<bool>(
       valueListenable: loadingLoginService.loadingCondicionEstado,
       builder: (BuildContext context, loadingCondicion, _) {
         return loadingCondicion
-            ? const SizedBox.shrink()
+            ? const LoadingEstrellas()
             : ValueListenableBuilder<List<VacunasCondicion>>(
                 valueListenable:
                     vacunasCondicionService.listaVacunasCondicionEstado,
@@ -1961,6 +2396,7 @@ class _VacunasPageState extends State<VacunasPage> {
                                   decoration: AppSuperficies.campoBusqueda(
                                     context,
                                   ),
+                                  clipBehavior: Clip.antiAlias,
                                   child: TextField(
                                     autocorrect: false,
                                     controller: controladorBusquedaCondicion,
@@ -1975,16 +2411,13 @@ class _VacunasPageState extends State<VacunasPage> {
                                       focusedBorder: InputBorder.none,
                                       border: InputBorder.none,
                                       hintText: 'Buscar condición…',
-                                      hintStyle: Theme.of(context)
-                                          .textTheme
-                                          .bodyLarge
-                                          ?.copyWith(
-                                            fontSize: 15,
-                                            color:
-                                                AppSuperficies.textoSecundario(
-                                                  context,
-                                                ),
-                                          ),
+                                      hintStyle: bar.textoDestacado.copyWith(
+                                        fontWeight: FontWeight.w400,
+                                        color:
+                                            AppSuperficies.textoSecundario(
+                                              context,
+                                            ),
+                                      ),
                                     ),
                                     focusNode: focusNode,
                                     onChanged: (value) {
@@ -2085,11 +2518,12 @@ class _VacunasPageState extends State<VacunasPage> {
   }
 
   Widget containerEsquemas() {
+    final bar = context.sisTipografia;
     return ValueListenableBuilder<bool>(
       valueListenable: loadingLoginService.loadingEsquemaEstado,
       builder: (BuildContext context, loadingEsquema, _) {
         return loadingEsquema
-            ? const SizedBox.shrink()
+            ? const LoadingEstrellas()
             : ValueListenableBuilder<List<VacunasEsquema>>(
                 valueListenable:
                     vacunasEsquemaService.listaVacunasEsquemaEstado,
@@ -2111,6 +2545,7 @@ class _VacunasPageState extends State<VacunasPage> {
                                   decoration: AppSuperficies.campoBusqueda(
                                     context,
                                   ),
+                                  clipBehavior: Clip.antiAlias,
                                   child: TextField(
                                     autocorrect: false,
                                     controller: controladorBusquedaEsquema,
@@ -2125,16 +2560,13 @@ class _VacunasPageState extends State<VacunasPage> {
                                       focusedBorder: InputBorder.none,
                                       border: InputBorder.none,
                                       hintText: 'Buscar esquema…',
-                                      hintStyle: Theme.of(context)
-                                          .textTheme
-                                          .bodyLarge
-                                          ?.copyWith(
-                                            fontSize: 15,
-                                            color:
-                                                AppSuperficies.textoSecundario(
-                                                  context,
-                                                ),
-                                          ),
+                                      hintStyle: bar.textoDestacado.copyWith(
+                                        fontWeight: FontWeight.w400,
+                                        color:
+                                            AppSuperficies.textoSecundario(
+                                              context,
+                                            ),
+                                      ),
                                     ),
                                     focusNode: focusNode,
                                     onChanged: (value) {
@@ -2237,7 +2669,7 @@ class _VacunasPageState extends State<VacunasPage> {
       valueListenable: loadingLoginService.loadingDosisEstado,
       builder: (BuildContext context, loadingDosisFlag, _) {
         return loadingDosisFlag
-            ? const SizedBox.shrink()
+            ? const LoadingEstrellas()
             : ValueListenableBuilder<List<VacunasDosis>>(
                 valueListenable: vacunasDosisService.listaVacunasDosisEstado,
                 builder: (BuildContext context, listaDosis, _) {
@@ -2286,7 +2718,25 @@ class _VacunasPageState extends State<VacunasPage> {
   /// `containerFecha`) para poder dispararlo también desde la barra de
   /// acciones fija (`_barraAccionesFija`), no solo desde un botón dentro del
   /// contenido del paso.
+  /// Botón "Cambiar vacuna" de los diálogos de error de `_cargarLotesYAvanzar`.
+  /// En 'pendientes' no hay editor de vacuna por-campo (ver comentario en
+  /// `containerVerificar`): vuelve al paso 1 (lista de pendientes), no al 2.
+  void _volverACambiarVacuna(BuildContext dialogCtx) {
+    Navigator.of(dialogCtx).pop();
+    final destino = _modoRegistro == 'pendientes' ? 1 : 2;
+    setState(() {
+      pasos = destino;
+      _limpiarDesdePaso(destino);
+    });
+  }
+
   Future<void> _cargarLotesYAvanzar() async {
+    if (_fechaFueraDeRangoLotes) {
+      // No hay lotes registrados para aplicaciones tan viejas: se salta la
+      // consulta y `containerLotes()` muestra el input manual.
+      setState(() => pasos = 7);
+      return;
+    }
     loadingLoginService.cargaLotes(false);
     try {
       final tempLista = await vacunasRepository.validarLotes(
@@ -2304,17 +2754,7 @@ class _VacunasPageState extends State<VacunasPage> {
                 'No hay lotes registrados para esta vacuna. Seleccione otra dosis o cambie la vacuna.',
             textoBotonAlerta: 'Cambiar vacuna',
             textoBotonAlerta2: 'Cambiar dosis',
-            funcion1: () {
-              Navigator.of(dialogCtx).pop();
-              setState(() {
-                pasos = 2;
-                _selectCondicion = null;
-                _selectEsquema = null;
-                _selectDosis = null;
-                _selectLote = null;
-                listaLotes!.clear();
-              });
-            },
+            funcion1: () => _volverACambiarVacuna(dialogCtx),
             funcion2: () => Navigator.of(dialogCtx).pop(),
             icon: const Icon(Icons.inventory_2_outlined, size: 40),
             color: Theme.of(dialogCtx).colorScheme.tertiary,
@@ -2334,17 +2774,7 @@ class _VacunasPageState extends State<VacunasPage> {
                 'Intente con otra dosis o cambie la vacuna.',
             textoBotonAlerta: 'Cambiar vacuna',
             textoBotonAlerta2: 'Reintentar',
-            funcion1: () {
-              Navigator.of(dialogCtx).pop();
-              setState(() {
-                pasos = 2;
-                _selectCondicion = null;
-                _selectEsquema = null;
-                _selectDosis = null;
-                _selectLote = null;
-                listaLotes!.clear();
-              });
-            },
+            funcion1: () => _volverACambiarVacuna(dialogCtx),
             funcion2: () => Navigator.of(dialogCtx).pop(),
             icon: const Icon(Icons.error_outline, size: 40),
             color: Theme.of(_scaffoldKey.currentContext!).colorScheme.error,
@@ -2360,7 +2790,10 @@ class _VacunasPageState extends State<VacunasPage> {
         vacunasLotesService.cargarListaVacunasLotes(tempLista);
       });
       loadingLoginService.cargaLotes(false);
-      setState(() => pasos++);
+      // `pasos = 7` (no `pasos++`): reusado también desde la vía
+      // "Pendientes" (`_seleccionarPendiente`), que dispara esto sin haber
+      // pasado por el paso 6 (Fecha).
+      setState(() => pasos = 7);
     } catch (_) {
       if (!mounted) return;
       showDialog(
@@ -2373,17 +2806,7 @@ class _VacunasPageState extends State<VacunasPage> {
               'No se pudieron obtener los lotes. Revise la conexión o cambie la vacuna.',
           textoBotonAlerta: 'Cambiar vacuna',
           textoBotonAlerta2: 'Cerrar',
-          funcion1: () {
-            Navigator.of(dialogCtx).pop();
-            setState(() {
-              pasos = 2;
-              _selectCondicion = null;
-              _selectEsquema = null;
-              _selectDosis = null;
-              _selectLote = null;
-              listaLotes!.clear();
-            });
-          },
+          funcion1: () => _volverACambiarVacuna(dialogCtx),
           funcion2: () => Navigator.of(dialogCtx).pop(),
           color: Theme.of(dialogCtx).colorScheme.error,
           icon: const Icon(Icons.wifi_off_rounded, size: 40),
@@ -2394,16 +2817,14 @@ class _VacunasPageState extends State<VacunasPage> {
 
   Widget containerFecha() {
     final cs = Theme.of(context).colorScheme;
-    final tt = Theme.of(context).textTheme;
-    final bar = context.sisTipografia;
     final fechaFmt =
         '${_selectFecha.day.toString().padLeft(2, '0')}/${_selectFecha.month.toString().padLeft(2, '0')}/${_selectFecha.year}';
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const VacunasTituloSeccionPaso(
-          etiqueta: 'PASO 6',
+        VacunasTituloSeccionPaso(
+          etiqueta: _etiquetaPasoCompartido(6),
           titulo: 'Fecha de Aplicación',
           subtitulo: 'Seleccione la fecha en que se aplicó la vacuna.',
         ),
@@ -2412,79 +2833,38 @@ class _VacunasPageState extends State<VacunasPage> {
           padding: const EdgeInsets.all(AppEspaciado.lg),
           decoration: BoxDecoration(
             color: cs.surfaceContainerLowest,
-            borderRadius: BorderRadius.circular(AppEspaciado.xl),
+            borderRadius: BorderRadius.circular(AppEspaciado.radioCampo),
             border: Border.all(
               color: cs.outlineVariant.withValues(alpha: 0.35),
             ),
           ),
-          child: Row(
-            children: [
-              Container(
-                width: 4,
-                height: 48,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(AppEspaciado.xs),
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [cs.tertiary, cs.tertiary.withValues(alpha: 0.55)],
-                  ),
-                ),
-              ),
-              const SizedBox(width: 14),
-              Icon(
-                Icons.calendar_today_outlined,
-                color: cs.tertiary,
-                size: AppTamanoIcono.mediano,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'FECHA SELECCIONADA',
-                      style: tt.labelSmall?.copyWith(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 1.35,
-                        color: cs.tertiary,
-                      ),
-                    ),
-                    const SizedBox(height: AppEspaciado.xs),
-                    Text(
-                      fechaFmt,
-                      style: bar.tituloTarjeta.copyWith(
-                        fontSize: 20,
-                        color: cs.onSurface,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              TextButton.icon(
-                style: AppBotones.estiloTextoPequeno(cs),
-                onPressed: () async {
-                  final fechaNacimiento = _fechaNacimientoBeneficiario();
-                  final DateTime primeraFecha =
-                      fechaNacimiento != null &&
-                          fechaNacimiento.isAfter(DateTime(2021))
-                      ? fechaNacimiento
-                      : DateTime(2021);
-                  final DateTime? nueva = await showDatePicker(
-                    context: context,
-                    initialDate: _selectFecha.isBefore(primeraFecha)
-                        ? primeraFecha
-                        : _selectFecha,
-                    firstDate: primeraFecha,
-                    lastDate: DateTime.now(),
-                  );
-                  if (nueva != null) setState(() => _selectFecha = nueva);
-                },
-                icon: const Icon(Icons.edit_calendar_outlined),
-                label: const Text('Cambiar'),
-              ),
-            ],
+          child: VacunasEncabezadoAcento(
+            icono: Icons.calendar_today_outlined,
+            color: cs.tertiary,
+            etiqueta: 'Fecha seleccionada',
+            titulo: fechaFmt,
+            trailing: TextButton.icon(
+              style: AppBotones.estiloTextoPequeno(cs),
+              onPressed: () async {
+                final fechaNacimiento = _fechaNacimientoBeneficiario();
+                final DateTime primeraFecha =
+                    fechaNacimiento != null &&
+                        fechaNacimiento.isAfter(DateTime(2021))
+                    ? fechaNacimiento
+                    : DateTime(2021);
+                final DateTime? nueva = await showDatePicker(
+                  context: context,
+                  initialDate: _selectFecha.isBefore(primeraFecha)
+                      ? primeraFecha
+                      : _selectFecha,
+                  firstDate: primeraFecha,
+                  lastDate: DateTime.now(),
+                );
+                if (nueva != null && mounted) setState(() => _selectFecha = nueva);
+              },
+              icon: const Icon(Icons.edit_calendar_outlined),
+              label: const Text('Cambiar'),
+            ),
           ),
         ),
       ],
@@ -2492,6 +2872,12 @@ class _VacunasPageState extends State<VacunasPage> {
   }
 
   Widget containerLotes() {
+    final cs = Theme.of(context).colorScheme;
+    final fechaFmt =
+        '${_selectFecha.day.toString().padLeft(2, '0')}/${_selectFecha.month.toString().padLeft(2, '0')}/${_selectFecha.year}';
+    if (_fechaFueraDeRangoLotes) {
+      return _loteManual(fechaFmt);
+    }
     return ValueListenableBuilder<List<Lotes>>(
       valueListenable: vacunasLotesService.listavacunaslotesEstado,
       builder: (BuildContext context, lotesDisponibles, _) {
@@ -2500,12 +2886,33 @@ class _VacunasPageState extends State<VacunasPage> {
             : Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const VacunasTituloSeccionPaso(
-                    etiqueta: 'PASO 7',
+                  VacunasTituloSeccionPaso(
+                    etiqueta: _etiquetaPasoCompartido(7),
                     titulo: 'Lote',
                     subtitulo:
                         'Seleccione el lote disponible para registrar la aplicación.',
                   ),
+                  if (_modoRegistro == 'pendientes') ...[
+                    Container(
+                      padding: const EdgeInsets.all(AppEspaciado.lg),
+                      decoration: BoxDecoration(
+                        color: cs.surfaceContainerLowest,
+                        borderRadius: BorderRadius.circular(
+                          AppEspaciado.radioCampo,
+                        ),
+                        border: Border.all(
+                          color: cs.outlineVariant.withValues(alpha: 0.35),
+                        ),
+                      ),
+                      child: VacunasEncabezadoAcento(
+                        icono: Icons.calendar_today_outlined,
+                        color: cs.tertiary,
+                        etiqueta: 'Fecha de aplicación',
+                        titulo: fechaFmt,
+                      ),
+                    ),
+                    const SizedBox(height: AppEspaciado.md),
+                  ],
                   Wrap(
                     spacing: AppEspaciado.sm,
                     runSpacing: AppEspaciado.sm,
@@ -2532,14 +2939,78 @@ class _VacunasPageState extends State<VacunasPage> {
     );
   }
 
+  /// Aplicaciones con fecha anterior al 1/1/2025: no hay lote registrado en
+  /// el sistema para validar contra una lista, así que se pide la serie a
+  /// mano. Si el operador no la tiene, se registra con "0" (ver
+  /// `_confirmarLoteManual`).
+  Widget _loteManual(String fechaFmt) {
+    final cs = Theme.of(context).colorScheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        VacunasTituloSeccionPaso(
+          etiqueta: _etiquetaPasoCompartido(7),
+          titulo: 'Lote',
+          subtitulo:
+              'No hay lotes registrados para aplicaciones anteriores al '
+              '01/01/2025. Cargue la serie si la tiene, o continúe sin ella.',
+        ),
+        Container(
+          padding: const EdgeInsets.all(AppEspaciado.lg),
+          decoration: BoxDecoration(
+            color: cs.surfaceContainerLowest,
+            borderRadius: BorderRadius.circular(AppEspaciado.radioCampo),
+            border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.35)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              VacunasEncabezadoAcento(
+                icono: Icons.calendar_today_outlined,
+                color: cs.tertiary,
+                etiqueta: 'Fecha de aplicación',
+                titulo: fechaFmt,
+              ),
+              const SizedBox(height: AppEspaciado.md),
+              TextField(
+                controller: controladorLoteManual,
+                keyboardType: TextInputType.text,
+                decoration: const InputDecoration(
+                  labelText: 'Serie del lote (opcional)',
+                  hintText: 'Sin serie: se registra con "0"',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Confirma el paso Lote cuando la fecha está fuera de rango (ver
+  /// `_loteManual`): sin serie cargada, se registra "0".
+  void _confirmarLoteManual() {
+    final serie = controladorLoteManual.text.trim();
+    loadingLoginService.cargarVerificar(false);
+    setState(() {
+      _selectLote = Lotes(
+        id_sysdesa18: '0',
+        sysdesa18_lote: serie.isEmpty ? '0' : serie,
+      );
+      pasos++;
+    });
+  }
+
   Widget _sinLotesDisponibles() {
     final cs = Theme.of(context).colorScheme;
+    final bar = context.sisTipografia;
     final tt = Theme.of(context).textTheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const VacunasTituloSeccionPaso(
-          etiqueta: 'PASO 7',
+        VacunasTituloSeccionPaso(
+          etiqueta: _etiquetaPasoCompartido(7),
           titulo: 'Sin lotes disponibles',
           subtitulo: 'No hay lotes registrados para la vacuna seleccionada.',
         ),
@@ -2566,31 +3037,47 @@ class _VacunasPageState extends State<VacunasPage> {
               Text(
                 'No hay lotes disponibles para esta vacuna. Puede cambiar la dosis o volver a seleccionar otra vacuna.',
                 textAlign: TextAlign.center,
-                style: tt.bodyMedium?.copyWith(
-                  fontSize: 14,
+                style: bar.textoPrincipal.copyWith(
                   height: 1.4,
                   color: AppSuperficies.textoSecundario(context),
                 ),
               ),
               const SizedBox(height: AppEspaciado.lg),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  OutlinedButton.icon(
-                    style: AppBotones.estiloOutlinedSecundario(),
-                    onPressed: () => setState(() => pasos = 5),
-                    icon: const Icon(Icons.arrow_back_rounded),
-                    label: const Text('Cambiar dosis'),
-                  ),
-                  const SizedBox(width: AppEspaciado.md),
-                  OutlinedButton.icon(
-                    style: AppBotones.estiloOutlinedSecundario(),
-                    onPressed: () => setState(() => pasos = 2),
-                    icon: const Icon(Icons.vaccines_outlined),
-                    label: const Text('Cambiar vacuna'),
-                  ),
-                ],
-              ),
+              if (_modoRegistro == 'pendientes')
+                OutlinedButton.icon(
+                  style: AppBotones.estiloOutlinedSecundario(),
+                  onPressed: () => setState(() {
+                    pasos = 1;
+                    _limpiarDesdePaso(1);
+                  }),
+                  icon: const Icon(Icons.pending_actions_rounded),
+                  label: const Text('Volver a pendientes'),
+                )
+              else
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    OutlinedButton.icon(
+                      style: AppBotones.estiloOutlinedSecundario(),
+                      onPressed: () => setState(() {
+                        pasos = 5;
+                        _limpiarDesdePaso(5);
+                      }),
+                      icon: const Icon(Icons.arrow_back_rounded),
+                      label: const Text('Cambiar dosis'),
+                    ),
+                    const SizedBox(width: AppEspaciado.md),
+                    OutlinedButton.icon(
+                      style: AppBotones.estiloOutlinedSecundario(),
+                      onPressed: () => setState(() {
+                        pasos = 2;
+                        _limpiarDesdePaso(2);
+                      }),
+                      icon: const Icon(Icons.vaccines_outlined),
+                      label: const Text('Cambiar vacuna'),
+                    ),
+                  ],
+                ),
             ],
           ),
         ),
@@ -2600,14 +3087,13 @@ class _VacunasPageState extends State<VacunasPage> {
 
   Widget containerVerificar() {
     final cs = Theme.of(context).colorScheme;
-    final tt = Theme.of(context).textTheme;
-
     Widget filaResumen(
       String etiqueta,
       String? valor,
       int paso,
       IconData icono,
     ) {
+      final bar = context.sisTipografia;
       return Padding(
         padding: const EdgeInsets.symmetric(
           horizontal: AppEspaciado.md,
@@ -2620,9 +3106,9 @@ class _VacunasPageState extends State<VacunasPage> {
               height: 36,
               decoration: BoxDecoration(
                 color: cs.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(AppRadio.radioTooltip),
               ),
-              child: Icon(icono, size: 18, color: cs.onSurfaceVariant),
+              child: Icon(icono, size: AppTamanoIcono.pequeno, color: cs.onSurfaceVariant),
             ),
             const SizedBox(width: AppEspaciado.sm),
             Expanded(
@@ -2631,18 +3117,15 @@ class _VacunasPageState extends State<VacunasPage> {
                 children: [
                   Text(
                     etiqueta,
-                    style: tt.labelSmall?.copyWith(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
+                    style: bar.etiquetaSeccion.copyWith(
                       letterSpacing: 0.5,
                       color: AppSuperficies.textoSecundario(context),
                     ),
                   ),
-                  const SizedBox(height: 2),
+                  const SizedBox(height: AppEspaciado.xs),
                   Text(
                     valor?.isNotEmpty == true ? valor! : '—',
-                    style: tt.bodyMedium?.copyWith(
-                      fontSize: 14,
+                    style: bar.textoPrincipal.copyWith(
                       fontWeight: FontWeight.w600,
                       color: cs.onSurface,
                     ),
@@ -2654,7 +3137,10 @@ class _VacunasPageState extends State<VacunasPage> {
             ),
             TextButton(
               style: AppBotones.estiloTextoPequeno(cs),
-              onPressed: () => setState(() => pasos = paso),
+              onPressed: () => setState(() {
+                _limpiarDesdePaso(paso);
+                pasos = paso;
+              }),
               child: const Text('Cambiar'),
             ),
           ],
@@ -2662,11 +3148,18 @@ class _VacunasPageState extends State<VacunasPage> {
       );
     }
 
+    // En 'pendientes' la vacuna/condición/esquema/dosis se resolvieron
+    // juntas al tocar una fila; no hay editor por-campo válido en esta vía
+    // (containerVacunas/Condiciones/Esquemas/Dosis asumen el wizard "por
+    // perfil" con sus propias listas cargadas). "Cambiar" en esas 4 filas
+    // vuelve al paso 1 (la lista de pendientes) en vez de a esos pasos.
+    final pasoEditarCombo = _modoRegistro == 'pendientes' ? 1 : null;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const VacunasTituloSeccionPaso(
-          etiqueta: 'PASO 8',
+        VacunasTituloSeccionPaso(
+          etiqueta: _etiquetaPasoCompartido(8),
           titulo: 'Confirmar y registrar',
           subtitulo:
               'Revise los datos y toque "Registrar" abajo. Toque "Cambiar" en cualquier fila para corregir.',
@@ -2682,23 +3175,27 @@ class _VacunasPageState extends State<VacunasPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              filaResumen(
-                'Perfil',
-                _selectPerfil?.sysvacu12_descripcion,
-                1,
-                Icons.assignment_ind_outlined,
-              ),
-              Divider(
-                height: 1,
-                thickness: 1,
-                indent: AppEspaciado.md,
-                endIndent: AppEspaciado.md,
-                color: cs.outlineVariant.withValues(alpha: 0.35),
-              ),
+              // Vía "Pendientes" no pasa por selección de perfil: no mostrar
+              // una fila "Perfil" vacía que no corresponde a ese flujo.
+              if (_modoRegistro != 'pendientes') ...[
+                filaResumen(
+                  'Perfil',
+                  _selectPerfil?.sysvacu12_descripcion,
+                  1,
+                  Icons.assignment_ind_outlined,
+                ),
+                Divider(
+                  height: 1,
+                  thickness: 1,
+                  indent: AppEspaciado.md,
+                  endIndent: AppEspaciado.md,
+                  color: cs.outlineVariant.withValues(alpha: 0.35),
+                ),
+              ],
               filaResumen(
                 'Vacuna',
                 _selectVacunas?.sysvacu04_nombre,
-                2,
+                pasoEditarCombo ?? 2,
                 Icons.vaccines_outlined,
               ),
               Divider(
@@ -2711,7 +3208,7 @@ class _VacunasPageState extends State<VacunasPage> {
               filaResumen(
                 'Condición',
                 _selectCondicion?.sysvacu01_descripcion,
-                3,
+                pasoEditarCombo ?? 3,
                 Icons.health_and_safety_outlined,
               ),
               Divider(
@@ -2724,7 +3221,7 @@ class _VacunasPageState extends State<VacunasPage> {
               filaResumen(
                 'Esquema',
                 _selectEsquema?.sysvacu02_descripcion,
-                4,
+                pasoEditarCombo ?? 4,
                 Icons.account_tree_outlined,
               ),
               Divider(
@@ -2737,7 +3234,7 @@ class _VacunasPageState extends State<VacunasPage> {
               filaResumen(
                 'Dosis',
                 _selectDosis?.sysvacu05_nombre,
-                5,
+                pasoEditarCombo ?? 5,
                 Icons.numbers_outlined,
               ),
               Divider(
@@ -2826,7 +3323,6 @@ class _VacunasPageState extends State<VacunasPage> {
   /// Formulario escanear / D.N.I. / sexo del tutor (solo invocar si es menor o sin edad).
   Widget _panelRegistroTutorMenor(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final tt = Theme.of(context).textTheme;
     final bar = context.sisTipografia;
     final sinDatoEdad = _beneficiarioSinDatoEdadParseable();
 
@@ -2841,93 +3337,38 @@ class _VacunasPageState extends State<VacunasPage> {
           children: [
             // ── Encabezado ──────────────────────────────────────────────
             Padding(
-              padding: const EdgeInsets.fromLTRB(18, 18, 14, 16),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    width: 4,
-                    constraints: const BoxConstraints(minHeight: 52),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(AppEspaciado.xs),
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          cs.tertiary,
-                          cs.tertiary.withValues(alpha: 0.55),
-                        ],
+              padding: const EdgeInsets.fromLTRB(
+                AppEspaciado.lg,
+                AppEspaciado.lg,
+                AppEspaciado.md,
+                AppEspaciado.lg,
+              ),
+              child: VacunasEncabezadoAcento(
+                icono: Icons.family_restroom_outlined,
+                color: cs.tertiary,
+                etiqueta: 'Menor de edad',
+                titulo: 'Tutor o responsable',
+                subtitulo: 'Reverso del D.N.I. con la cámara o datos abajo.',
+                trailing: IconButton(
+                  tooltip: 'Ayuda: registrar tutor o responsable',
+                  style: AppBotones.estiloIconoAyuda(cs),
+                  onPressed: () {
+                    showDialog(
+                      context: _scaffoldKey.currentContext!,
+                      builder: (BuildContext context) => DialogoAlerta(
+                        envioFuncion2: false,
+                        envioFuncion1: false,
+                        tituloAlerta: 'Información',
+                        descripcionAlerta:
+                            'Escanee el código del D.N.I. (frente o reverso según la tarjeta) o ingrese número y sexo como en el documento.',
+                        textoBotonAlerta: 'Listo',
+                        color: cs.primary,
+                        icon: const Icon(Icons.info_outline_rounded, size: 40),
                       ),
-                    ),
-                  ),
-                  const SizedBox(width: 14),
-                  Icon(
-                    Icons.family_restroom_outlined,
-                    color: cs.tertiary,
-                    size: 22,
-                  ),
-                  const SizedBox(width: AppEspaciado.md),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'MENOR DE EDAD',
-                          style: tt.labelSmall?.copyWith(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 1.35,
-                            height: 1.2,
-                            color: cs.tertiary,
-                          ),
-                        ),
-                        const SizedBox(height: AppEspaciado.sm),
-                        Text(
-                          'Tutor o responsable',
-                          style: bar.tituloTarjeta.copyWith(
-                            fontSize: 21,
-                            height: 1.12,
-                            color: cs.onSurface,
-                          ),
-                        ),
-                        const SizedBox(height: AppEspaciado.xs),
-                        Text(
-                          'Reverso del D.N.I. con la cámara o datos abajo.',
-                          style: tt.titleSmall?.copyWith(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w500,
-                            height: 1.25,
-                            color: cs.onSurfaceVariant,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: AppEspaciado.sm),
-                  IconButton(
-                    tooltip: 'Ayuda: registrar tutor o responsable',
-                    style: AppBotones.estiloIconoAyuda(cs),
-                    onPressed: () {
-                      showDialog(
-                        context: _scaffoldKey.currentContext!,
-                        builder: (BuildContext context) => DialogoAlerta(
-                          envioFuncion2: false,
-                          envioFuncion1: false,
-                          tituloAlerta: 'Información',
-                          descripcionAlerta:
-                              'Escanee el código del D.N.I. (frente o reverso según la tarjeta) o ingrese número y sexo como en el documento.',
-                          textoBotonAlerta: 'Listo',
-                          color: cs.primary,
-                          icon: const Icon(
-                            Icons.info_outline_rounded,
-                            size: 40,
-                          ),
-                        ),
-                      );
-                    },
-                    icon: const Icon(Icons.info_outline_rounded),
-                  ),
-                ],
+                    );
+                  },
+                  icon: const Icon(Icons.info_outline_rounded),
+                ),
               ),
             ),
 
@@ -2971,8 +3412,7 @@ class _VacunasPageState extends State<VacunasPage> {
                                 'No se recibió la edad desde el servidor. '
                                 'Si el beneficiario es menor, cargue al tutor o '
                                 'responsable; si es mayor, puede ignorar este bloque.',
-                                style: tt.bodyMedium?.copyWith(
-                                  fontSize: 13,
+                                style: bar.textoSecundario.copyWith(
                                   height: 1.35,
                                   color: cs.onPrimaryContainer,
                                 ),
@@ -3180,7 +3620,12 @@ class _VacunasPageState extends State<VacunasPage> {
         notificacionesDosisService.cargarRegistro(NotificacionesDosis());
       }
     } catch (_) {
-      // Sin conexión: se mantiene el historial cargado hasta ahora.
+      // Sin conexión: se mantiene el historial cargado hasta ahora, pero
+      // la vía Pendientes no puede confundir esto con "no tiene nada
+      // pendiente" (misma llamada trae "vacunas_pendientes").
+      vacunasPendientesService.marcarError(
+        'No se pudo actualizar las vacunas pendientes. Revise la conexión.',
+      );
     }
   }
 
@@ -3234,12 +3679,37 @@ class _VacunasPageState extends State<VacunasPage> {
             ),
             envioFuncion1: true,
             funcion1: () {
-              reiniciarCicloVacuna();
-              Navigator.pushAndRemoveUntil(
-                context,
-                MaterialPageRoute(builder: (context) => const VacunasPage()),
-                (Route<dynamic> route) => false,
-              );
+              if (_modoRegistro == 'pendientes') {
+                // No se re-navega a una VacunasPage nueva: initState()
+                // corre _heredarPerfilDeLaVisita() y, como el perfil de la
+                // visita ya quedó fijado, fuerza pasos=2 (paso "por perfil")
+                // salteando la lista de pendientes. Se resetea en la misma
+                // instancia para volver directo al paso 1 con pendientes.
+                Navigator.of(dialogCtx).pop();
+                reiniciarCicloVacuna();
+                // `reiniciarCicloVacuna()` vacía `listaPerfilesVacunacionEstado`
+                // (es de estadosPorVacuna). Como acá no hay `initState` nuevo
+                // que la vuelva a pedir, si el operador después cambia a "Por
+                // perfil" se queda con la lista vacía ("no se pudieron cargar
+                // los perfiles") sin que haya fallado nada. Se repide ahora.
+                final idRegistrador =
+                    registradorService.registrador?.id_flxcore03;
+                if (idRegistrador != null && idRegistrador.isNotEmpty) {
+                  cargarPerfilesService(idRegistrador);
+                }
+                setState(() {
+                  pasos = 1;
+                  _selectPerfil = null;
+                  _limpiarDesdePaso(1);
+                });
+              } else {
+                reiniciarCicloVacuna();
+                Navigator.pushAndRemoveUntil(
+                  context,
+                  MaterialPageRoute(builder: (context) => const VacunasPage()),
+                  (Route<dynamic> route) => false,
+                );
+              }
             },
             tituloAlerta: 'Información',
             descripcionAlerta:
@@ -3318,26 +3788,6 @@ class _VacunasPageState extends State<VacunasPage> {
     setState(() {
       tutorService.cargarTutor(Tutor.desdeBeneficiario(tutor));
     });
-  }
-
-  Future<bool> onWillPop() async {
-    final mensajeExit = await showDialog(
-      context: _scaffoldKey.currentContext!,
-      builder: (context) => DialogoAlerta(
-        envioFuncion2: true,
-        envioFuncion1: true,
-        tituloAlerta: '¿Cerrar sesión?',
-        descripcionAlerta:
-            'Si sale, deberá iniciar sesión otra vez escaneando su documento.',
-        textoBotonAlerta: 'Sí, salir',
-        textoBotonAlerta2: 'No',
-        funcion1: () => Navigator.of(context).pop(true),
-        funcion2: () => Navigator.of(context).pop(false),
-        color: Theme.of(context).colorScheme.error,
-        icon: const Icon(Icons.new_releases_outlined, size: 40.0),
-      ),
-    );
-    return mensajeExit ?? false;
   }
 
   cargarPerfilesService(String id) async {

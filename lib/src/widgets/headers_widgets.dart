@@ -8,18 +8,19 @@ class EncabezadoWave extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final oscuro = Theme.of(context).brightness == Brightness.dark;
     final color = cs.primary.withValues(alpha: oscuro ? 0.32 : 0.22);
+    final size = MediaQuery.sizeOf(context);
     return Stack(
       children: [
         SizedBox(
-          height: MediaQuery.of(context).size.height,
-          width: MediaQuery.of(context).size.width,
+          height: size.height,
+          width: size.width,
           child: CustomPaint(
             painter: _EncabezadoWavePainter(color),
           ),
         ),
         SizedBox(
-          height: MediaQuery.of(context).size.height * 0.80,
-          width: MediaQuery.of(context).size.width,
+          height: size.height * _EncabezadoWavePainter.fraccionAltoCapaTrasera,
+          width: size.width,
           child: CustomPaint(
             painter: _EncabezadoWavePainter(color),
           ),
@@ -31,6 +32,8 @@ class EncabezadoWave extends StatelessWidget {
 
 class _EncabezadoWavePainter extends CustomPainter {
   _EncabezadoWavePainter(this.fillColor);
+
+  static const double fraccionAltoCapaTrasera = 0.80;
 
   final Color fillColor;
 
@@ -72,36 +75,17 @@ class EncabezadoDos extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final oscuro = Theme.of(context).brightness == Brightness.dark;
     final color = cs.primary.withValues(alpha: oscuro ? 0.48 : 0.55);
+    final size = MediaQuery.sizeOf(context);
     return Stack(
       children: [
-        SizedBox(
-          height: MediaQuery.of(context).size.height * 0.50,
-          width: MediaQuery.of(context).size.width,
-          child: CustomPaint(
-            painter: _EncabezadoDosPainter(color),
+        for (final fraccion in _EncabezadoDosPainter.fraccionesAltoCapas)
+          SizedBox(
+            height: size.height * fraccion,
+            width: size.width,
+            child: CustomPaint(
+              painter: _EncabezadoDosPainter(color),
+            ),
           ),
-        ),
-        SizedBox(
-          height: MediaQuery.of(context).size.height * 0.49,
-          width: MediaQuery.of(context).size.width,
-          child: CustomPaint(
-            painter: _EncabezadoDosPainter(color),
-          ),
-        ),
-        SizedBox(
-          height: MediaQuery.of(context).size.height * 0.48,
-          width: MediaQuery.of(context).size.width,
-          child: CustomPaint(
-            painter: _EncabezadoDosPainter(color),
-          ),
-        ),
-        SizedBox(
-          height: MediaQuery.of(context).size.height * 0.47,
-          width: MediaQuery.of(context).size.width,
-          child: CustomPaint(
-            painter: _EncabezadoDosPainter(color),
-          ),
-        ),
       ],
     );
   }
@@ -109,6 +93,8 @@ class EncabezadoDos extends StatelessWidget {
 
 class _EncabezadoDosPainter extends CustomPainter {
   _EncabezadoDosPainter(this.fillColor);
+
+  static const List<double> fraccionesAltoCapas = [0.50, 0.49, 0.48, 0.47];
 
   final Color fillColor;
 
@@ -151,9 +137,10 @@ class EncabezadoCircular extends StatelessWidget {
         .colorScheme
         .primary
         .withValues(alpha: Theme.of(context).brightness == Brightness.dark ? 0.35 : 0.45);
+    final size = MediaQuery.sizeOf(context);
     return SizedBox(
-      height: MediaQuery.of(context).size.height * 0.6,
-      width: MediaQuery.of(context).size.width,
+      height: size.height * _EncabezadoCircularPainter.fraccionAlto,
+      width: size.width,
       child: CustomPaint(
         painter: _EncabezadoCircularPainter(color),
       ),
@@ -163,6 +150,8 @@ class EncabezadoCircular extends StatelessWidget {
 
 class _EncabezadoCircularPainter extends CustomPainter {
   _EncabezadoCircularPainter(this.fillColor);
+
+  static const double fraccionAlto = 0.6;
 
   final Color fillColor;
 

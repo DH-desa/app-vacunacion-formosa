@@ -2,7 +2,8 @@ import 'dart:convert';
 import 'package:sistema_vacunacion/src/utils/encoding_utils.dart';
 
 List<InfoVacunas> infoVacunasFromJson(String str) => List<InfoVacunas>.from(
-    json.decode(str).map((x) => InfoVacunas.fromJson(x)));
+  json.decode(str).map((x) => InfoVacunas.fromJson(x)),
+);
 
 String infoVacunasToJson(List<InfoVacunas> data) =>
     json.encode(List<dynamic>.from(data.map((x) => x.toJson())));
@@ -30,11 +31,11 @@ class InfoVacunas {
   String? mensaje;
 
   factory InfoVacunas.fromJson(Map<String, dynamic> json) => InfoVacunas(
-        id_sysvacu04: json["id_sysvacu04"],
-        sysvacu04_nombre: fixEncoding(json["sysvacu04_nombre"]),
-        codigo_mensaje: json["codigo_mensaje"],
-        mensaje: fixEncoding(json["mensaje"]),
-      );
+    id_sysvacu04: json["id_sysvacu04"],
+    sysvacu04_nombre: fixEncoding(json["sysvacu04_nombre"]),
+    codigo_mensaje: json["codigo_mensaje"],
+    mensaje: fixEncoding(json["mensaje"]),
+  );
 
   InfoVacunas.fromJsonMap(Map<String, dynamic> json) {
     id_sysvacu04 = json["id_sysvacu04"];
@@ -44,17 +45,20 @@ class InfoVacunas {
   }
 
   Map<String?, dynamic> toJson() => {
-        id_sysvacu04: id_sysvacu04,
-        sysvacu04_nombre: sysvacu04_nombre,
-        codigo_mensaje: codigo_mensaje,
-        mensaje: mensaje,
-      };
+    id_sysvacu04: id_sysvacu04,
+    sysvacu04_nombre: sysvacu04_nombre,
+    codigo_mensaje: codigo_mensaje,
+    mensaje: mensaje,
+  };
 
   InfoVacunas.fromJsonList(List<dynamic>? jsonList) {
     if (jsonList == null) return;
 
-    for (var item in jsonList) {
-      final informacion = InfoVacunas.fromJsonMap(item);
+    for (final item in jsonList) {
+      if (item is! Map) continue;
+      final informacion = InfoVacunas.fromJsonMap(
+        Map<String, dynamic>.from(item),
+      );
       items.add(informacion);
     }
   }

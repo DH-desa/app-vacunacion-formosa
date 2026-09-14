@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
 import 'package:sistema_vacunacion/src/config/config.dart';
+import 'package:sistema_vacunacion/src/core/helpers/helpers.dart';
 import 'package:sistema_vacunacion/src/domain/entities/models.dart';
 import 'package:sistema_vacunacion/src/data/repositories/repositories.dart';
 import 'package:sistema_vacunacion/src/presentation/state/services.dart';
@@ -115,7 +116,7 @@ class _VacunadorPageState extends State<VacunadorPage> {
       child: PopScope(
         canPop: false,
         onPopInvokedWithResult: (didPop, result) {
-          if (!didPop) onWillPop();
+          if (!didPop) onWillPop(context);
         },
         child: Scaffold(
           backgroundColor: cs.surface,
@@ -155,7 +156,7 @@ class _VacunadorPageState extends State<VacunadorPage> {
                   ),
                   const SizedBox(height: AppEspaciado.xl),
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    padding: const EdgeInsets.symmetric(horizontal: AppEspaciado.xs),
                     child: ValueListenableBuilder<bool>(
                       valueListenable: mismoVacunador,
                       builder: (context, esMismoVacunador, _) {
@@ -209,14 +210,12 @@ class _VacunadorPageState extends State<VacunadorPage> {
 
   Widget _etiquetaSeccion(BuildContext context, String texto) {
     final cs = Theme.of(context).colorScheme;
-    final base = Theme.of(context).textTheme.labelSmall ?? const TextStyle();
+    final bar = context.sisTipografia;
     return Padding(
-      padding: const EdgeInsets.only(bottom: AppEspaciado.sm, top: 2),
+      padding: const EdgeInsets.only(bottom: AppEspaciado.sm, top: AppEspaciado.xs),
       child: Text(
         texto.toUpperCase(),
-        style: base.copyWith(
-          fontSize: 11,
-          fontWeight: FontWeight.w700,
+        style: bar.etiquetaSeccion.copyWith(
           letterSpacing: 1.05,
           color: cs.onSurfaceVariant.withValues(alpha: 0.95),
         ),
@@ -250,11 +249,10 @@ class _VacunadorPageState extends State<VacunadorPage> {
                       'Resumen',
                       style: bar.tituloTarjeta.copyWith(color: cs.onSurface),
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: AppEspaciado.xs),
                     Text(
                       'Efector, registrador y vacunador asignado',
-                      style: tt.bodyMedium?.copyWith(
-                        fontSize: 13,
+                      style: bar.textoSecundario.copyWith(
                         height: 1.35,
                         color: cs.onSurfaceVariant,
                       ),
@@ -343,34 +341,33 @@ class _VacunadorPageState extends State<VacunadorPage> {
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Expanded(
-                child: ValueListenableBuilder<Usuarios?>(
-                  valueListenable: registradorService.registradorEstado,
-                  builder: (context, registrador, _) {
-                    final desc = registrador?.sysofic01_descripcion ?? '';
-                    return Text(
-                      desc,
-                      style: tt.titleMedium?.copyWith(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        height: 1.3,
-                        color: cs.onSurface,
-                      ),
-                    );
-                  },
-                ),
+                  child: ValueListenableBuilder<Usuarios?>(
+                    valueListenable: registradorService.registradorEstado,
+                    builder: (context, registrador, _) {
+                      final desc = registrador?.sysofic01_descripcion ?? '';
+                      return Text(
+                        desc,
+                        style: bar.textoFormulario.copyWith(
+                          fontWeight: FontWeight.w600,
+                          height: 1.3,
+                          color: cs.onSurface,
+                        ),
+                      );
+                    },
+                  ),
               ),
               Material(
                 color: cs.primary.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(AppEspaciado.radioBoton),
                 child: InkWell(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(AppEspaciado.radioBoton),
                   onTap: () => _abrirSelectorEfectores(context),
                   child: Padding(
-                    padding: const EdgeInsets.all(12),
+                    padding: const EdgeInsets.all(AppEspaciado.md),
                     child: FaIcon(
                       FontAwesomeIcons.hospital,
                       // Tamaño fijo: sin [MediaQuery] / responsive_builder en la tarjeta (menos invalidaciones con IME).
-                      size: 18,
+                      size: AppTamanoIcono.pequeno,
                       color: cs.primary,
                     ),
                   ),
@@ -387,9 +384,7 @@ class _VacunadorPageState extends State<VacunadorPage> {
                 enTerrenoValor
                     ? 'Vacunación en terreno (campaña o salida)'
                     : 'En establecimiento fijo',
-                style: tt.bodyLarge?.copyWith(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
+                style: bar.textoDestacado.copyWith(
                   height: 1.35,
                   color: cs.onSurface,
                 ),
@@ -436,16 +431,15 @@ class _VacunadorPageState extends State<VacunadorPage> {
     bool destacarAlerta = false,
   }) {
     final cs = Theme.of(context).colorScheme;
-    final tt = Theme.of(context).textTheme;
+    final bar = context.sisTipografia;
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         SizedBox(
-          width: 102,
+          width: context.escala(compacto: 92.0, normal: 102.0, grande: 112.0),
           child: Text(
             etiqueta,
-            style: tt.bodySmall?.copyWith(
-              fontSize: 13,
+            style: bar.textoSecundario.copyWith(
               fontWeight: FontWeight.w700,
               color: cs.onSurfaceVariant,
             ),
@@ -457,8 +451,7 @@ class _VacunadorPageState extends State<VacunadorPage> {
             physics: const ClampingScrollPhysics(),
             child: Text(
               valor,
-              style: tt.bodyLarge?.copyWith(
-                fontSize: 15,
+              style: bar.textoDestacado.copyWith(
                 fontWeight: destacarAlerta ? FontWeight.w800 : FontWeight.w500,
                 letterSpacing: destacarAlerta ? 1.2 : 0,
                 color: destacarAlerta ? cs.error : cs.onSurface,
@@ -472,7 +465,7 @@ class _VacunadorPageState extends State<VacunadorPage> {
 
   Widget _tarjetaOpcionesVacunacion(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final tt = Theme.of(context).textTheme;
+    final bar = context.sisTipografia;
 
     return Container(
       width: double.infinity,
@@ -487,8 +480,7 @@ class _VacunadorPageState extends State<VacunadorPage> {
         children: [
           Text(
             'Opciones de sesión',
-            style: tt.labelLarge?.copyWith(
-              fontSize: 12,
+            style: bar.textoChip.copyWith(
               fontWeight: FontWeight.w800,
               letterSpacing: 0.6,
               color: cs.onSurfaceVariant,
@@ -539,7 +531,7 @@ class _VacunadorPageState extends State<VacunadorPage> {
     required ValueChanged<bool> onChanged,
   }) {
     final cs = Theme.of(context).colorScheme;
-    final tt = Theme.of(context).textTheme;
+    final bar = context.sisTipografia;
     final suave = cs.onSurface.withValues(alpha: 0.5);
 
     return Column(
@@ -547,9 +539,7 @@ class _VacunadorPageState extends State<VacunadorPage> {
       children: [
         Text(
           titulo,
-          style: tt.titleSmall?.copyWith(
-            fontSize: 15,
-            fontWeight: FontWeight.w600,
+          style: bar.textoDestacado.copyWith(
             height: 1.25,
             color: cs.onSurface,
           ),
@@ -557,8 +547,7 @@ class _VacunadorPageState extends State<VacunadorPage> {
         const SizedBox(height: AppEspaciado.xs),
         Text(
           valor ? 'Respuesta actual: Sí' : 'Respuesta actual: No',
-          style: tt.bodyMedium?.copyWith(
-            fontSize: 13,
+          style: bar.textoSecundario.copyWith(
             fontWeight: FontWeight.w800,
             color: cs.primary,
             height: 1.2,
@@ -573,8 +562,7 @@ class _VacunadorPageState extends State<VacunadorPage> {
               child: Text(
                 'No',
                 textAlign: TextAlign.end,
-                style: tt.titleSmall?.copyWith(
-                  fontSize: 15,
+                style: bar.textoDestacado.copyWith(
                   fontWeight: valor ? FontWeight.w500 : FontWeight.w800,
                   color: valor ? suave : cs.onSurface,
                 ),
@@ -585,8 +573,7 @@ class _VacunadorPageState extends State<VacunadorPage> {
               child: Text(
                 'Sí',
                 textAlign: TextAlign.start,
-                style: tt.titleSmall?.copyWith(
-                  fontSize: 15,
+                style: bar.textoDestacado.copyWith(
                   fontWeight: valor ? FontWeight.w800 : FontWeight.w500,
                   color: valor ? cs.onSurface : suave,
                 ),
@@ -600,7 +587,7 @@ class _VacunadorPageState extends State<VacunadorPage> {
 
   void _abrirSelectorEfectores(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final tt = Theme.of(context).textTheme;
+    final bar = context.sisTipografia;
 
     showModalBottomSheet<void>(
       useRootNavigator: true,
@@ -629,9 +616,7 @@ class _VacunadorPageState extends State<VacunadorPage> {
                       const SizedBox(width: AppEspaciado.sm),
                       Text(
                         'Efectores',
-                        style: tt.titleLarge?.copyWith(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w700,
+                        style: bar.tituloSeccion.copyWith(
                           color: cs.onSurface,
                         ),
                       ),
@@ -763,25 +748,6 @@ class _VacunadorPageState extends State<VacunadorPage> {
     }
   }
 
-  Future<bool> onWillPop() async {
-    final mensajeExit = await showDialog(
-      context: context,
-      builder: (context) => DialogoAlerta(
-        envioFuncion2: true,
-        envioFuncion1: true,
-        tituloAlerta: '¿Cerrar sesión?',
-        descripcionAlerta:
-            'Si sale, deberá iniciar sesión otra vez escaneando su documento.',
-        textoBotonAlerta: 'Sí, salir',
-        textoBotonAlerta2: 'No',
-        funcion1: () => Navigator.of(context).pop(true),
-        funcion2: () => Navigator.of(context).pop(false),
-        color: Theme.of(context).colorScheme.error,
-        icon: const Icon(Icons.new_releases_outlined, size: 40),
-      ),
-    );
-    return mensajeExit ?? false;
-  }
 }
 
 /// Lista de efectores dentro del modal: carga, error con reintento o ítems.
@@ -809,6 +775,7 @@ class _ListaEfectoresHojaState extends State<_ListaEfectoresHoja> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
+    final bar = context.sisTipografia;
 
     return ValueListenableBuilder<List<Efectores>>(
       valueListenable: efectoresService.listaEfectoresEstado,
@@ -888,14 +855,12 @@ class _ListaEfectoresHojaState extends State<_ListaEfectoresHoja> {
               ),
               title: Text(
                 item.sysofic01Descripcion ?? '',
-                style: tt.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w600,
-                  fontSize: 15,
+                style: bar.textoDestacado.copyWith(
                   color: cs.onSurface,
                 ),
               ),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(AppEspaciado.radioBoton),
               ),
               onTap: () {
                 final String nom = item.sysofic01Descripcion ?? '';
@@ -1000,7 +965,6 @@ class _RegistroVacunadorPanelState extends State<_RegistroVacunadorPanel> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final tt = Theme.of(context).textTheme;
     final bar = context.sisTipografia;
 
     return Container(
@@ -1024,11 +988,10 @@ class _RegistroVacunadorPanelState extends State<_RegistroVacunadorPanel> {
                       'Registro del vacunador',
                       style: bar.tituloTarjeta.copyWith(color: cs.onSurface),
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: AppEspaciado.xs),
                     Text(
                       'Código del frente o reverso del D.N.I., o ingreso manual',
-                      style: tt.labelLarge?.copyWith(
-                        fontSize: 12,
+                      style: bar.textoChip.copyWith(
                         fontWeight: FontWeight.w700,
                         letterSpacing: 0.8,
                         color: cs.onSurfaceVariant,
@@ -1067,8 +1030,7 @@ class _RegistroVacunadorPanelState extends State<_RegistroVacunadorPanel> {
           Text(
             'Escanee el código del D.N.I. del vacunador (frente o reverso según el tipo de tarjeta) o ingréselo manualmente.',
             textAlign: TextAlign.center,
-            style: tt.bodyMedium?.copyWith(
-              fontSize: 14,
+            style: bar.textoPrincipal.copyWith(
               height: 1.45,
               color: cs.onSurfaceVariant,
             ),

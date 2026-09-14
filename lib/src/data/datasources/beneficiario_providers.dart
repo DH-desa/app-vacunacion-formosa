@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:developer' as developer;
 
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:http/http.dart' as http;
 import 'package:sistema_vacunacion/src/config/config.dart';
 import 'package:sistema_vacunacion/src/core/debug/dev_log_service.dart';
@@ -86,11 +87,13 @@ class _BeneficiarioProviders {
           'bodyPreview': crudo,
         },
       );
-      // ignore: avoid_print
-      print(
-        '[beneficiario] error=$e statusCode=${resp?.statusCode} '
-        'bodyPreview=$crudo',
-      );
+      if (kDebugMode) {
+        // ignore: avoid_print
+        print(
+          '[beneficiario] error=$e statusCode=${resp?.statusCode} '
+          'bodyPreview=$crudo',
+        );
+      }
       throw 'Ocurrio un error $e';
     }
 

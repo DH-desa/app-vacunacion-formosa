@@ -21,7 +21,6 @@ class MarcaCabeceraGradiente extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final tt = Theme.of(context).textTheme;
     final bar = context.sisTipografia;
     final oscuro = Theme.of(context).brightness == Brightness.dark;
 
@@ -30,9 +29,9 @@ class MarcaCabeceraGradiente extends StatelessWidget {
       constraints: BoxConstraints(minHeight: alturaMinima),
       padding: EdgeInsets.fromLTRB(
         AppEspaciado.xl,
-        MediaQuery.of(context).padding.top + AppEspaciado.md,
+        MediaQuery.paddingOf(context).top + AppEspaciado.md,
         AppEspaciado.xl,
-        AppEspaciado.xxl,
+        AppEspaciado.sm,
       ),
       decoration: BoxDecoration(
         gradient: LinearGradient(
@@ -63,31 +62,26 @@ class MarcaCabeceraGradiente extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(
-            titulo,
-            style: bar.tituloTarjeta.copyWith(
-              fontSize: 26,
-              color: Colors.white,
-              height: 1.15,
-            ),
-          ),
+          Text(titulo, style: bar.displayMediano.copyWith(color: Colors.white)),
           if (subtitulo != null && subtitulo!.isNotEmpty) ...[
             const SizedBox(height: AppEspaciado.sm),
             Text(
               subtitulo!,
-              maxLines: 3,
+              maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: tt.bodyMedium?.copyWith(
-                fontSize: 14,
+              style: bar.textoPrincipal.copyWith(
                 fontWeight: FontWeight.w500,
-                height: 1.35,
                 color: Colors.white.withValues(alpha: 0.88),
               ),
             ),
           ],
           if (acciones != null && acciones!.isNotEmpty) ...[
             const SizedBox(height: AppEspaciado.md),
-            Wrap(spacing: AppEspaciado.sm, runSpacing: AppEspaciado.sm, children: acciones!),
+            Wrap(
+              spacing: AppEspaciado.sm,
+              runSpacing: AppEspaciado.sm,
+              children: acciones!,
+            ),
           ],
         ],
       ),

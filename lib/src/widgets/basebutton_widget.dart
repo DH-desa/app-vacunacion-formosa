@@ -6,6 +6,8 @@ class BaseButton extends StatelessWidget {
   final Widget child;
   final double? ancho;
 
+  static const double _fraccionAnchoMaximo = 0.9;
+
   const BaseButton({
     Key? key,
     required this.child,
@@ -14,7 +16,7 @@ class BaseButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    double mediaQueryWidth = MediaQuery.of(context).size.width * .9;
+    double mediaQueryWidth = MediaQuery.sizeOf(context).width * _fraccionAnchoMaximo;
     double fixedWidth = ancho!;
     return ClipRRect(
       borderRadius: BorderRadius.circular(AppEspaciado.radioBoton),

@@ -4,7 +4,8 @@ import 'package:sistema_vacunacion/src/utils/encoding_utils.dart';
 
 List<ValidaVacunacionTxt> valVacunasTXTFromJson(String str) =>
     List<ValidaVacunacionTxt>.from(
-        json.decode(str).map((x) => ValidaVacunacionTxt.fromJson(x)));
+      json.decode(str).map((x) => ValidaVacunacionTxt.fromJson(x)),
+    );
 
 String valVacunasTXTToJson(List<ValidaVacunacionTxt> data) =>
     json.encode(List<dynamic>.from(data.map((x) => x.toJson())));
@@ -67,20 +68,23 @@ class ValidaVacunacionTxt {
   }
 
   Map<String?, dynamic> toJson() => {
-        sysdesa10_dni: sysdesa10_dni,
-        sysdesa10_nro_tramite: sysdesa10_nro_tramite,
-        sysdesa10_nombre: sysdesa10_nombre,
-        sysdesa10_apellido: sysdesa10_apellido,
-        sysdesa10_sexo: sysdesa10_sexo,
-        codigo_mensaje: codigo_mensaje,
-        mensaje: mensaje,
-      };
+    sysdesa10_dni: sysdesa10_dni,
+    sysdesa10_nro_tramite: sysdesa10_nro_tramite,
+    sysdesa10_nombre: sysdesa10_nombre,
+    sysdesa10_apellido: sysdesa10_apellido,
+    sysdesa10_sexo: sysdesa10_sexo,
+    codigo_mensaje: codigo_mensaje,
+    mensaje: mensaje,
+  };
 
   ValidaVacunacionTxt.fromJsonList(List<dynamic>? jsonList) {
     if (jsonList == null) return;
 
-    for (var item in jsonList) {
-      final valVacunasTXT = ValidaVacunacionTxt.fromJsonMap(item);
+    for (final item in jsonList) {
+      if (item is! Map) continue;
+      final valVacunasTXT = ValidaVacunacionTxt.fromJsonMap(
+        Map<String, dynamic>.from(item),
+      );
       items.add(valVacunasTXT);
     }
   }

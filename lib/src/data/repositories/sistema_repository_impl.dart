@@ -17,20 +17,21 @@ class SistemaRepositoryImpl implements SistemaRepository {
     required bool puerpera,
     required bool personalSalud,
     required String? edadDias,
-  }) =>
-      notificacionesProvider.validarNotificaciones(
-        dni,
-        sexo,
-        embarazada: embarazada,
-        puerpera: puerpera,
-        personalSalud: personalSalud,
-        edadDias: edadDias,
-      );
+  }) => notificacionesProvider.validarNotificaciones(
+    dni,
+    sexo,
+    embarazada: embarazada,
+    puerpera: puerpera,
+    personalSalud: personalSalud,
+    edadDias: edadDias,
+  );
 
   @override
   Future validarVersionNuevaVersion(String nombreapp, String versionApp) =>
       validacionVersionProvider.validarVersionNuevaVersion(
-          nombreapp, versionApp);
+        nombreapp,
+        versionApp,
+      );
 }
 
 final sistemaRepository = SistemaRepositoryImpl();

@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>API_KEY</key>
+	<string>AIzaSyBhewqZDSY8-AySX3zJ1MWVQWWAijeI6h8</string>
+	<key>GCM_SENDER_ID</key>
+	<string>316126422536</string>
+	<key>PLIST_VERSION</key>
+	<string>1</string>
+	<key>BUNDLE_ID</key>
+	<string>ar.gob.formosa.vacunacion</string>
+	<key>PROJECT_ID</key>
+	<string>app-vacunacion-formosa</string>
+	<key>STORAGE_BUCKET</key>
+	<string>app-vacunacion-formosa.firebasestorage.app</string>
+	<key>IS_ADS_ENABLED</key>
+	<false></false>
+	<key>IS_ANALYTICS_ENABLED</key>
+	<false></false>
+	<key>IS_APPINVITE_ENABLED</key>
+	<true></true>
+	<key>IS_GCM_ENABLED</key>
+	<true></true>
+	<key>IS_SIGNIN_ENABLED</key>
+	<true></true>
+	<key>GOOGLE_APP_ID</key>
+	<string>1:316126422536:ios:dcaf992cdefb35a2db53bd</string>
+</dict>
+</plist>

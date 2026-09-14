@@ -10,6 +10,7 @@ import 'vacunas_condicion_service.dart';
 import 'vacunas_esquema_service.dart';
 import 'vacunasxperfiles_service.dart';
 import 'notificacionesdosis_service.dart';
+import 'vacunaspendientes_service.dart';
 import 'insertregistro_service.dart';
 import 'loadingLogin_service.dart';
 
@@ -31,6 +32,8 @@ final List<Estado> estadosPorPersona = [
   situacionBeneficiarioService.esPersonalDeSaludEstado,
   notificacionesDosisService.notiDosisEstado,
   notificacionesDosisService.listaDosisAplicadasEstado,
+  vacunasPendientesService.listaPendientesEstado,
+  vacunasPendientesService.mensajeErrorEstado,
   perfilesVacunacionService.perfilesVacunacionEstado,
   insertRegistroService.visitaRegistrosEstado,
 ];

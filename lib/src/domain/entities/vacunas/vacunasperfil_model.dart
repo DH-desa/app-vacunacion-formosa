@@ -40,17 +40,20 @@ class PerfilesVacunacion {
   }
 
   Map<String, dynamic> toJson() => {
-        "id_sysvacu12": id_sysvacu12,
-        "sysvacu12_descripcion": sysvacu12_descripcion,
-        "codigo_mensaje": codigo_mensaje,
-        "mensaje": mensaje,
-      };
+    "id_sysvacu12": id_sysvacu12,
+    "sysvacu12_descripcion": sysvacu12_descripcion,
+    "codigo_mensaje": codigo_mensaje,
+    "mensaje": mensaje,
+  };
 
   PerfilesVacunacion.fromJsonList(List<dynamic>? jsonList) {
     if (jsonList == null) return;
 
-    for (var item in jsonList) {
-      final informacion = PerfilesVacunacion.fromJsonMap(item);
+    for (final item in jsonList) {
+      if (item is! Map) continue;
+      final informacion = PerfilesVacunacion.fromJsonMap(
+        Map<String, dynamic>.from(item),
+      );
       items.add(informacion);
     }
   }

@@ -1,8 +1,11 @@
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
+import 'firebase_options.dart';
 import 'package:sistema_vacunacion/src/config/config.dart';
 import 'package:sistema_vacunacion/src/core/debug/dev_overlay.dart';
 import 'package:sistema_vacunacion/src/presentation/state/enviroment_service.dart';
@@ -12,6 +15,26 @@ import 'src/pages/pages.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
+  // Solo reportar crashes de builds release: los de kDebugMode son ruido de
+  // desarrollo, no señal real de producción.
+  await FirebaseCrashlytics.instance.setCrashlyticsCollectionEnabled(
+    kReleaseMode,
+  );
+  FlutterError.onError = (errorDetails) {
+    FlutterError.presentError(errorDetails);
+    FirebaseCrashlytics.instance.recordFlutterFatalError(errorDetails);
+  };
+  PlatformDispatcher.instance.onError = (error, stack) {
+    FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
+    return true;
+  };
+
+  await SystemChrome.setPreferredOrientations([
+    DeviceOrientation.portraitUp,
+    DeviceOrientation.portraitDown,
+  ]);
   await temaAppService.inicializar();
   _buildReleaseErrorWidgetBuilder();
   AppConfig appconfig = AppConfig(enviroment: 'DEV');
@@ -24,12 +47,13 @@ _buildReleaseErrorWidgetBuilder() {
   if (kReleaseMode) {
     ErrorWidget.builder = (errorDetails) {
       return Container(
-        color: Colors.red,
-        child: const Center(
-          child: Icon(
-            Icons.error,
-            color: Colors.white,
-          ),
+        alignment: Alignment.center,
+        padding: const EdgeInsets.all(8),
+        color: Colors.black12,
+        child: const Text(
+          'No se pudo mostrar este contenido.\nProbá volver atrás e intentar de nuevo.',
+          textAlign: TextAlign.center,
+          style: TextStyle(color: Colors.black54, fontSize: 12),
         ),
       );
     };
@@ -50,18 +74,23 @@ class MyApp extends StatelessWidget {
   }
 
   MaterialApp _buildMaterialApp() {
-    SystemChrome.setPreferredOrientations([
-      DeviceOrientation.portraitUp,
-      DeviceOrientation.portraitDown,
-    ]);
+    final env = enviromentService.envState?.enviroment;
     return MaterialApp(
-      debugShowCheckedModeBanner:
-          enviromentService.envState!.enviroment == 'DEV' ? true : false,
+      debugShowCheckedModeBanner: env == 'DEV',
       builder: (context, child) {
-        if (enviromentService.envState?.enviroment == 'DEV') {
-          return DevOverlay(child: child!);
-        }
-        return child!;
+        final clamped = MediaQuery(
+          data: MediaQuery.of(context).copyWith(
+            // Raíz del problema "se ve chico / se ve grande / salta de línea":
+            // el usuario puede tener escala de fuente del OS hasta 2x; sin tope
+            // los `Text` rompen layouts calibrados a 1.0x. Tope 1.3 = inclusivo
+            // sin destruir el diseño.
+            textScaler: MediaQuery.textScalerOf(
+              context,
+            ).clamp(minScaleFactor: 1.0, maxScaleFactor: 1.3),
+          ),
+          child: env == 'DEV' ? DevOverlay(child: child!) : child!,
+        );
+        return clamped;
       },
       initialRoute: LoginBody.nombreRuta,
       theme: SisVacuTheme.light.theme,
@@ -77,9 +106,8 @@ class MyApp extends StatelessWidget {
       ],
       routes: {
         LoginBody.nombreRuta: (BuildContext context) => const LoginBody(),
-        VacunadorPage.nombreRuta: (BuildContext context) => const VacunadorPage(
-              infoCargador: [],
-            ),
+        VacunadorPage.nombreRuta: (BuildContext context) =>
+            const VacunadorPage(infoCargador: []),
         BusquedaBeneficiario.nombreRuta: (context) =>
             const BusquedaBeneficiario(),
         VacunasPage.nombreRuta: (BuildContext context) => const VacunasPage(),

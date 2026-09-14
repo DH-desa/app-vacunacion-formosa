@@ -31,15 +31,15 @@ class VacunasDosis {
   String? mensaje;
 
   factory VacunasDosis.fromJson(Map<String, dynamic> json) => VacunasDosis(
-        id_sysvacu05: json["id_sysvacu05"],
-        sysvacu05_nombre: fixEncoding(json["sysvacu05_nombre"]),
-        sysvacu05_orden: fixEncoding(json["sysvacu05_orden"]),
-        sysvacu05_cod_sisa: json["sysvacu05_cod_sisa"],
-        sysvacu05_esquema: json["sysvacu05_esquema"],
-        sysvacu05_orden_numerico: json["sysvacu05_orden_numerico"],
-        codigo_mensaje: json["codigo_mensaje"],
-        mensaje: fixEncoding(json["mensaje"]),
-      );
+    id_sysvacu05: json["id_sysvacu05"],
+    sysvacu05_nombre: fixEncoding(json["sysvacu05_nombre"]),
+    sysvacu05_orden: fixEncoding(json["sysvacu05_orden"]),
+    sysvacu05_cod_sisa: json["sysvacu05_cod_sisa"],
+    sysvacu05_esquema: json["sysvacu05_esquema"],
+    sysvacu05_orden_numerico: json["sysvacu05_orden_numerico"],
+    codigo_mensaje: json["codigo_mensaje"],
+    mensaje: fixEncoding(json["mensaje"]),
+  );
 
   VacunasDosis.fromJsonMap(Map<String, dynamic> json) {
     id_sysvacu05 = json["id_sysvacu05"];
@@ -53,21 +53,24 @@ class VacunasDosis {
   }
 
   Map<String, dynamic> toJson() => {
-        "id_sysvacu05": id_sysvacu05,
-        "sysvacu05_nombre": sysvacu05_nombre,
-        "sysvacu05_orden": sysvacu05_orden,
-        "sysvacu05_cod_sisa": sysvacu05_cod_sisa,
-        "sysvacu05_esquema": sysvacu05_esquema,
-        "sysvacu05_orden_numerico": sysvacu05_orden_numerico,
-        "codigo_mensaje": codigo_mensaje,
-        "mensaje": mensaje,
-      };
+    "id_sysvacu05": id_sysvacu05,
+    "sysvacu05_nombre": sysvacu05_nombre,
+    "sysvacu05_orden": sysvacu05_orden,
+    "sysvacu05_cod_sisa": sysvacu05_cod_sisa,
+    "sysvacu05_esquema": sysvacu05_esquema,
+    "sysvacu05_orden_numerico": sysvacu05_orden_numerico,
+    "codigo_mensaje": codigo_mensaje,
+    "mensaje": mensaje,
+  };
 
   VacunasDosis.fromJsonList(List<dynamic>? jsonList) {
     if (jsonList == null) return;
 
-    for (var item in jsonList) {
-      final vacunasDosis = VacunasDosis.fromJsonMap(item);
+    for (final item in jsonList) {
+      if (item is! Map) continue;
+      final vacunasDosis = VacunasDosis.fromJsonMap(
+        Map<String, dynamic>.from(item),
+      );
       items.add(vacunasDosis);
     }
   }

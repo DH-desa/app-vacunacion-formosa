@@ -3,7 +3,6 @@ import 'dart:io' show Platform;
 import 'package:animate_do/animate_do.dart';
 import 'package:flutter/material.dart';
 import 'package:sistema_vacunacion/src/config/config.dart';
-import 'package:sistema_vacunacion/src/config/appsize_config.dart';
 import 'package:sistema_vacunacion/src/data/datasources/providers.dart';
 import 'package:sistema_vacunacion/src/data/repositories/repositories.dart';
 import 'package:sistema_vacunacion/src/presentation/state/services.dart';
@@ -44,12 +43,6 @@ class _LoginBodyState extends State<LoginBody> {
     _cargarEtiquetaSemver();
   }
 
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    SizeConfiguracion().init(context);
-  }
-
   Future<void> _cargarEtiquetaSemver() async {
     final String s = await InformacionVersionApp.etiquetaSemver();
     if (!mounted) return;
@@ -65,7 +58,13 @@ class _LoginBodyState extends State<LoginBody> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final tt = Theme.of(context).textTheme;
+    final bar = context.sisTipografia;
+    final alturaHeaderLogin = context.escala(
+      compacto: 118.0,
+      normal: 132.0,
+      grande: 146.0,
+    );
+    const superposicionTarjetaLogin = 36.0;
 
     return Stack(
       children: [
@@ -95,25 +94,27 @@ class _LoginBodyState extends State<LoginBody> {
                   },
                 )
               : null,
-          body: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              MarcaCabeceraGradiente(
-                titulo: 'Bienvenido',
-                subtitulo: nombreApp,
-                alturaMinima: 162,
-              ),
-              Expanded(
-                child: SingleChildScrollView(
-                  physics: const BouncingScrollPhysics(),
-                  padding: const EdgeInsets.fromLTRB(
-                    AppEspaciado.lg,
-                    0,
-                    AppEspaciado.lg,
-                    AppEspaciado.lg,
-                  ),
-                  child: Transform.translate(
-                    offset: const Offset(0, -32),
+          body: SizedBox.expand(
+            child: Stack(
+              children: [
+                MarcaCabeceraGradiente(
+                  titulo: 'Bienvenido',
+                  subtitulo: nombreApp,
+                  alturaMinima: alturaHeaderLogin,
+                ),
+                Positioned.fill(
+                  top:
+                      MediaQuery.paddingOf(context).top +
+                      alturaHeaderLogin -
+                      superposicionTarjetaLogin,
+                  child: SingleChildScrollView(
+                    physics: const BouncingScrollPhysics(),
+                    padding: const EdgeInsets.fromLTRB(
+                      AppEspaciado.lg,
+                      0,
+                      AppEspaciado.lg,
+                      AppEspaciado.lg,
+                    ),
                     child: Column(
                       children: [
                         FadeInUp(
@@ -144,9 +145,7 @@ class _LoginBodyState extends State<LoginBody> {
                                 ),
                                 child: Text(
                                   'v$_etiquetaSemver',
-                                  style: tt.labelLarge?.copyWith(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600,
+                                  style: bar.textoChip.copyWith(
                                     color: cs.onSurfaceVariant,
                                   ),
                                 ),
@@ -170,9 +169,7 @@ class _LoginBodyState extends State<LoginBody> {
                           child: Text(
                             'Para uso interno — Ministerio de Desarrollo Humano',
                             textAlign: TextAlign.center,
-                            style: tt.bodySmall?.copyWith(
-                              fontSize: 12,
-                              height: 1.45,
+                            style: bar.textoChip.copyWith(
                               fontWeight: FontWeight.w500,
                               color: cs.onSurfaceVariant.withValues(alpha: 0.9),
                               letterSpacing: 0.2,
@@ -183,35 +180,41 @@ class _LoginBodyState extends State<LoginBody> {
                     ),
                   ),
                 ),
-              ),
-              SafeArea(
-                top: false,
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(
-                    AppEspaciado.lg,
-                    0,
-                    AppEspaciado.lg,
-                    AppEspaciado.sm,
-                  ),
-                  child: BounceInUp(
-                    from: 12,
-                    delay: const Duration(milliseconds: 500),
-                    child: Image.asset(
-                      'assets/img/fondo/AZUL_TODOS_UNIDOS.png',
-                      fit: BoxFit.contain,
-                      height: MediaQuery.of(context).size.height * 0.062,
-                      color: Theme.of(context).brightness == Brightness.dark
-                          ? cs.onSurface.withValues(alpha: 0.8)
-                          : null,
-                      colorBlendMode:
-                          Theme.of(context).brightness == Brightness.dark
-                          ? BlendMode.srcIn
-                          : null,
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  child: SafeArea(
+                    top: false,
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(
+                        AppEspaciado.lg,
+                        0,
+                        AppEspaciado.lg,
+                        AppEspaciado.sm,
+                      ),
+                      child: BounceInUp(
+                        from: 12,
+                        delay: const Duration(milliseconds: 500),
+                        child: Image.asset(
+                          'assets/img/fondo/AZUL_TODOS_UNIDOS.png',
+                          fit: BoxFit.contain,
+                          height: (MediaQuery.sizeOf(context).height * 0.062)
+                              .clamp(36.0, 64.0),
+                          color: Theme.of(context).brightness == Brightness.dark
+                              ? cs.onSurface.withValues(alpha: 0.8)
+                              : null,
+                          colorBlendMode:
+                              Theme.of(context).brightness == Brightness.dark
+                              ? BlendMode.srcIn
+                              : null,
+                        ),
+                      ),
                     ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
         ValueListenableBuilder<bool>(
@@ -228,13 +231,15 @@ class _LoginBodyState extends State<LoginBody> {
                     children: [
                       const LoadingEstrellas(),
                       if (loadingLoginService.loadingMensaje.isNotEmpty) ...[
-                        const SizedBox(height: 16),
+                        const SizedBox(height: AppEspaciado.lg),
                         Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 32),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: AppEspaciado.xxl,
+                          ),
                           child: Text(
                             loadingLoginService.loadingMensaje,
                             textAlign: TextAlign.center,
-                            style: tt.bodyMedium?.copyWith(
+                            style: bar.textoPrincipal.copyWith(
                               color: Colors.white,
                               fontWeight: FontWeight.w500,
                             ),
@@ -313,15 +318,15 @@ class _TarjetaLoginAcceso extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final tt = Theme.of(context).textTheme;
-    final ancho = MediaQuery.of(context).size.width;
+    final bar = context.sisTipografia;
+    final ancho = MediaQuery.sizeOf(context).width;
 
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(AppEspaciado.xl),
       decoration: AppSuperficies.tarjeta(
         context,
-      ).copyWith(borderRadius: BorderRadius.circular(20)),
+      ).copyWith(borderRadius: BorderRadius.circular(AppEspaciado.radioCampo)),
       child: Column(
         children: [
           Image.asset(
@@ -334,9 +339,7 @@ class _TarjetaLoginAcceso extends StatelessWidget {
           const SizedBox(height: AppEspaciado.xl),
           Text(
             'Acceso al sistema',
-            style: tt.labelSmall?.copyWith(
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
+            style: bar.etiquetaSeccion.copyWith(
               letterSpacing: 1.15,
               color: cs.onSurfaceVariant,
             ),
@@ -345,20 +348,13 @@ class _TarjetaLoginAcceso extends StatelessWidget {
           Text(
             'Escanee su D.N.I. para continuar',
             textAlign: TextAlign.center,
-            style: tt.titleMedium?.copyWith(
-              fontSize: 17,
-              fontWeight: FontWeight.w700,
-              height: 1.3,
-              color: cs.onSurface,
-            ),
+            style: bar.subtituloTarjeta.copyWith(color: cs.onSurface),
           ),
           const SizedBox(height: AppEspaciado.xs),
           Text(
             'Escanee el código del frente (DNI nuevo), del reverso (DNI anterior).',
             textAlign: TextAlign.center,
-            style: tt.bodyMedium?.copyWith(
-              fontSize: 13,
-              height: 1.4,
+            style: bar.textoSecundario.copyWith(
               color: cs.onSurfaceVariant.withValues(alpha: 0.95),
             ),
           ),
@@ -371,7 +367,7 @@ class _TarjetaLoginAcceso extends StatelessWidget {
                 'Registrador',
                 'Escanear documento',
                 iconBool: false,
-                anchoValor: MediaQuery.of(context).size.width * 0.11,
+                anchoValor: ancho * 0.11,
               ),
             ),
           ),

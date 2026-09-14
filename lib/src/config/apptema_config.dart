@@ -266,7 +266,7 @@ class SisVacuTheme {
           color: colorScheme.outline.withValues(alpha: oscuro ? 0.42 : 0.35),
         ),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(AppEspaciado.radioBoton),
         ),
       ),
       floatingActionButtonTheme: FloatingActionButtonThemeData(
@@ -275,7 +275,7 @@ class SisVacuTheme {
         elevation: 2,
         highlightElevation: 4,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(AppRadio.radioFAB),
         ),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
@@ -447,7 +447,7 @@ class SisVacuTheme {
         surfaceTintColor: Colors.transparent,
         elevation: 0,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(24),
+          borderRadius: BorderRadius.circular(AppRadio.radioDialog),
         ),
         titleTextStyle: nunito.titleLarge?.copyWith(
           fontWeight: FontWeight.w700,
@@ -464,7 +464,7 @@ class SisVacuTheme {
         elevation: 2,
         modalBackgroundColor: colorScheme.surfaceContainerLow,
         shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(AppEspaciado.radioCampo)),
         ),
         dragHandleColor: colorScheme.onSurfaceVariant.withValues(alpha: 0.35),
         showDragHandle: false,
@@ -484,14 +484,14 @@ class SisVacuTheme {
           color: colorScheme.onSurfaceVariant,
         ),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(AppEspaciado.radioBoton),
         ),
       ),
       tooltipTheme: TooltipThemeData(
         waitDuration: const Duration(milliseconds: 450),
         decoration: BoxDecoration(
           color: colorScheme.inverseSurface,
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(AppRadio.radioTooltip),
         ),
         textStyle: nunito.bodySmall?.copyWith(
           color: colorScheme.onInverseSurface,

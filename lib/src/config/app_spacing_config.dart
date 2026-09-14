@@ -27,6 +27,9 @@ class AppRadio {
   AppRadio._();
 
   static const double radioCabeceraGradiente = 28;
+  static const double radioFAB = 16;
+  static const double radioDialog = 24;
+  static const double radioTooltip = 10;
 }
 
 class AppMotion {

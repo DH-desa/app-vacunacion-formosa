@@ -1,6 +1,9 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart' show debugPrint, kDebugMode;
+import 'package:sistema_vacunacion/src/core/debug/dev_log_service.dart';
+
 /// Devuelve true si el texto tiene señales de mojibake (UTF-8 leído como Latin-1)
 /// o contiene el carácter de reemplazo Unicode (U+FFFD).
 bool _pareceMojibake(String str) {
@@ -47,6 +50,7 @@ bool textoNombreDesdeServidorPareceCorrupto(String s) {
 String decodificarCadenaPdf417Argentino(Uint8List? rawBytes, String? textoPlugin) {
   final fallback = (textoPlugin ?? '').trim();
   if (rawBytes == null || rawBytes.isEmpty) {
+    _logDecodePdf417(rawBytes, fallback, null, null, fallback, 'sin rawBytes');
     return fallback;
   }
 
@@ -60,21 +64,67 @@ String decodificarCadenaPdf417Argentino(Uint8List? rawBytes, String? textoPlugin
 
   bool tieneArrobas(String s) => s.contains('@');
 
+  String elegido;
+  String motivo;
   if (tieneArrobas(latin1Str) && !cadenaDecodificadaPdf417PareceCorrupta(latin1Str)) {
-    return latin1Str;
-  }
-  if (tieneArrobas(fallback) && !cadenaDecodificadaPdf417PareceCorrupta(fallback)) {
-    return fallback;
-  }
-  if (utf8Str != null &&
+    elegido = latin1Str;
+    motivo = 'latin1 (ok)';
+  } else if (tieneArrobas(fallback) && !cadenaDecodificadaPdf417PareceCorrupta(fallback)) {
+    elegido = fallback;
+    motivo = 'fallback nativo (latin1 rechazado)';
+  } else if (utf8Str != null &&
       tieneArrobas(utf8Str) &&
       !cadenaDecodificadaPdf417PareceCorrupta(utf8Str)) {
-    return utf8Str;
+    elegido = utf8Str;
+    motivo = 'utf8 (latin1 y fallback rechazados)';
+  } else if (tieneArrobas(latin1Str)) {
+    elegido = latin1Str;
+    motivo = 'latin1 forzado (ningún candidato pasó el filtro)';
+  } else if (utf8Str != null && tieneArrobas(utf8Str)) {
+    elegido = utf8Str;
+    motivo = 'utf8 forzado (ningún candidato pasó el filtro)';
+  } else {
+    elegido = fallback.isNotEmpty ? fallback : latin1Str;
+    motivo = 'último recurso (ningún candidato tiene @)';
   }
 
-  if (tieneArrobas(latin1Str)) return latin1Str;
-  if (utf8Str != null && tieneArrobas(utf8Str)) return utf8Str;
-  return fallback.isNotEmpty ? fallback : latin1Str;
+  _logDecodePdf417(rawBytes, fallback, latin1Str, utf8Str, elegido, motivo);
+  return elegido;
+}
+
+/// Diagnóstico temporal: vuelca al Dev Log Panel los bytes crudos y las 3
+/// variantes de decodificación candidatas, para investigar caracteres raros
+/// y fechas/edades mal calculadas sin tener que adivinar sobre el código.
+void _logDecodePdf417(
+  Uint8List? rawBytes,
+  String fallback,
+  String? latin1Str,
+  String? utf8Str,
+  String elegido,
+  String motivo,
+) {
+  final hex = rawBytes
+      ?.map((b) => b.toRadixString(16).padLeft(2, '0'))
+      .join(' ');
+  final datos = {
+    'bytesHex': hex,
+    'bytesLength': rawBytes?.length,
+    'latin1': latin1Str,
+    'utf8': utf8Str,
+    'nativo': fallback,
+    'elegido': elegido,
+  };
+  devLogService.log(
+    DevLogTipo.info,
+    'EscanerDNI/decode',
+    'PDF417 decodificado: $motivo',
+    datos: datos,
+  );
+  // El Dev Log Panel solo se monta con enviroment == 'DEV' (ver main.dart);
+  // esta impresión sirve para verlo en `flutter run` / logcat sin tocar eso.
+  if (kDebugMode) {
+    debugPrint('[EscanerDNI/decode] $motivo · $datos');
+  }
 }
 
 /// Decodifica el body de una respuesta HTTP de manera robusta.

@@ -10,6 +10,7 @@ export 'package:sistema_vacunacion/src/data/datasources/vacunados/vacunadoscant_
 export 'package:sistema_vacunacion/src/data/datasources/sistema/notificaciones_providers.dart';
 export 'package:sistema_vacunacion/src/data/datasources/sistema/insertregistro_providers.dart';
 export 'package:sistema_vacunacion/src/data/datasources/sistema/validarversion_providers.dart';
+export 'package:sistema_vacunacion/src/data/datasources/sistema/feedback_providers.dart';
 export 'package:sistema_vacunacion/src/data/datasources/vacunas/perfilesvacunacion_providers.dart';
 export 'package:sistema_vacunacion/src/data/datasources/vacunas/vacunas_esquema_providers.dart';
 export 'package:sistema_vacunacion/src/data/datasources/vacunas/vacunas_condicion_providers.dart';
