@@ -1,134 +1,139 @@
-import 'package:animate_do/animate_do.dart';
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
-import 'package:sistema_vacunacion/src/config/appcolor_config.dart';
+
+import 'package:sistema_vacunacion/src/config/config.dart';
 
 class DialogoAlerta extends StatelessWidget {
-  final String? tituloAlerta,
-      descripcionAlerta,
-      textoBotonAlerta,
-      textoBotonAlerta2;
-  final Image? image;
-  final Icon icon;
-  final Color? color;
-  final Function? funcion1;
-  final Function? funcion2;
+  final String? tituloAlerta;
+  final String? descripcionAlerta;
+  final String? textoBotonAlerta;
+  final String? textoBotonAlerta2;
   final bool envioFuncion1;
   final bool envioFuncion2;
+  final void Function()? funcion1;
+  final void Function()? funcion2;
+  final Color? color;
+  final Icon? icon;
+  final bool dosBotones;
+  final Widget? contenido;
+  final List<Widget>? accionesExtra;
 
   const DialogoAlerta({
     Key? key,
-    required this.tituloAlerta,
-    required this.descripcionAlerta,
-    required this.textoBotonAlerta,
-    this.image,
-    required this.icon,
-    required this.color,
-    this.funcion1,
-    required this.envioFuncion1,
-    this.funcion2,
-    required this.envioFuncion2,
+    this.tituloAlerta,
+    this.descripcionAlerta,
+    this.textoBotonAlerta,
     this.textoBotonAlerta2,
+    this.envioFuncion1 = true,
+    this.envioFuncion2 = true,
+    this.funcion1,
+    this.funcion2,
+    this.color,
+    this.icon,
+    this.dosBotones = false,
+    this.contenido,
+    this.accionesExtra,
   }) : super(key: key);
+
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final Color acento = color ?? cs.primary;
+    final Color textoSobreAcento = Colors.white;
+
     return Dialog(
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppEspaciado.radioCampo),
       ),
-      elevation: 0.0,
-      backgroundColor: Colors.transparent,
-      child: contenidoDialogo(context),
-    );
-  }
-
-  contenidoDialogo(BuildContext context) {
-    double padding = 16.0;
-    double avatarRadius = 40.0;
-    return Stack(children: <Widget>[
-      Container(
-          padding: EdgeInsets.only(
-            top: avatarRadius + padding,
-            left: padding,
-            right: padding,
-          ),
-          margin: EdgeInsets.only(top: avatarRadius),
-          decoration: BoxDecoration(
-              color: Colors.white,
-              shape: BoxShape.rectangle,
-              borderRadius: BorderRadius.circular(padding),
-              boxShadow: const [
-                BoxShadow(
-                  color: Colors.black26,
-                  blurRadius: 10.0,
-                  offset: Offset(0.0, 10.0),
-                )
-              ]),
-          child: Column(mainAxisSize: MainAxisSize.min, children: <Widget>[
-            Text(
-              tituloAlerta!,
-              style: GoogleFonts.barlow(
-                  textStyle: const TextStyle(
-                fontSize: 24.0,
-                fontWeight: FontWeight.w600,
-              )),
-            ),
-            const SizedBox(height: 16.0),
-            Text(descripcionAlerta!,
-                textAlign: TextAlign.center,
-                style: GoogleFonts.nunito(
-                    textStyle: const TextStyle(
-                  fontWeight: FontWeight.w300,
-                  fontSize: 18.0,
-                ))),
-            const SizedBox(height: 16.0),
+      child: Padding(
+        padding: const EdgeInsets.all(AppEspaciado.lg),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
-                envioFuncion2
-                    ? Align(
-                        alignment: Alignment.bottomLeft,
-                        child: TextButton(
-                          onPressed: () {
-                            funcion2!();
-                          },
-                          child: Text(
-                            textoBotonAlerta2!,
-                            style: GoogleFonts.nunito(
-                                fontWeight: FontWeight.w800,
-                                color: SisVacuColor.red),
-                          ),
-                        ))
-                    : Container(),
-                Align(
-                    alignment: Alignment.bottomRight,
-                    child: TextButton(
-                      onPressed: () {
-                        envioFuncion1
-                            ? funcion1!()
-                            : Navigator.of(context).pop();
-                      },
-                      child: Text(
-                        textoBotonAlerta!,
-                        style: GoogleFonts.nunito(
-                          fontWeight: FontWeight.w800,
+                if (icon != null) ...[
+                  Icon(
+                    icon!.icon,
+                    color: acento,
+                    size: 40,
+                  ),
+                  const SizedBox(width: AppEspaciado.md),
+                ],
+                Expanded(
+                  child: Text(
+                    tituloAlerta ?? 'Alerta',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.w700,
+                          color: cs.onSurface,
                         ),
-                      ),
-                    ))
+                  ),
+                ),
               ],
             ),
-          ])),
-      Positioned(
-          left: padding,
-          right: padding,
-          child: CircleAvatar(
-            child: Pulse(
-                infinite: true,
-                duration: const Duration(seconds: 2),
-                child: icon),
-            backgroundColor: color,
-            radius: avatarRadius,
-          ))
-    ]);
+            const SizedBox(height: AppEspaciado.md),
+            contenido ??
+                Text(
+                  descripcionAlerta ?? '',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        height: 1.4,
+                        color: AppSuperficies.textoSecundario(context),
+                      ),
+                ),
+            const SizedBox(height: AppEspaciado.xl),
+            if (accionesExtra != null)
+              Column(
+                children: [
+                  for (final accion in accionesExtra!) ...[
+                    SizedBox(width: double.infinity, child: accion),
+                    const SizedBox(height: AppEspaciado.sm),
+                  ],
+                ],
+              ),
+            if (dosBotones)
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => funcion2!(),
+                      style: AppBotones.estiloOutlined(cs),
+                      child: Text(textoBotonAlerta2!),
+                    ),
+                  ),
+                  const SizedBox(width: AppEspaciado.md),
+                  Expanded(
+                    child: FilledButton(
+                      onPressed: () => funcion1!(),
+                      style: AppBotones.estiloFilled(cs).copyWith(
+                        backgroundColor: WidgetStateProperty.all(acento),
+                        foregroundColor: WidgetStateProperty.all(textoSobreAcento),
+                      ),
+                      child: Text(textoBotonAlerta!),
+                    ),
+                  ),
+                ],
+              )
+            else
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: () {
+                    if (envioFuncion1) {
+                      funcion1!();
+                    } else {
+                      Navigator.of(context).pop();
+                    }
+                  },
+                  style: AppBotones.estiloFilled(cs).copyWith(
+                    backgroundColor: WidgetStateProperty.all(acento),
+                    foregroundColor: WidgetStateProperty.all(textoSobreAcento),
+                  ),
+                  child: Text(textoBotonAlerta!),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
   }
 }

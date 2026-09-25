@@ -1,10 +1,12 @@
+import 'dart:io' show Platform;
+
 import 'package:animate_do/animate_do.dart';
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
-
-import 'package:sistema_vacunacion/src/config/appsize_config.dart';
-import 'package:sistema_vacunacion/src/providers/providers.dart';
-import 'package:sistema_vacunacion/src/services/services.dart';
+import 'package:sistema_vacunacion/src/config/config.dart';
+import 'package:sistema_vacunacion/src/data/datasources/providers.dart';
+import 'package:sistema_vacunacion/src/data/repositories/repositories.dart';
+import 'package:sistema_vacunacion/src/presentation/state/services.dart';
+import 'package:sistema_vacunacion/src/utils/informacion_version_app_util.dart';
 import 'package:sistema_vacunacion/src/widgets/widgets.dart';
 
 import 'package:url_launcher/url_launcher.dart';
@@ -14,27 +16,38 @@ import '../pages.dart';
 class LoginBody extends StatefulWidget {
   static const String nombreRuta = '/Login';
 
-  const LoginBody({Key? key}) : super(key: key);
+  const LoginBody({super.key});
 
   @override
-  _LoginBodyState createState() => _LoginBodyState();
+  State<LoginBody> createState() => _LoginBodyState();
 }
 
 class _LoginBodyState extends State<LoginBody> {
-  //Cambiar este Valor cada vez que se vuelve a Buildear, tanto aqui como en el SV
-  final String versionApp = '3.0.0'; //Version Actual de la APP
-  final String nombreApp =
-      'Sistema de vacunación general'; //Nombre de la APP enviamos
+  /// Etiqueta de versión desde pubspec (solo X.Y.Z, sin +build).
+  String _etiquetaSemver = '…';
 
-  // ignore: unused_field
-  final String _scanBarcode = 'Desconocido';
+  final String nombreApp = 'Sistema de vacunación general';
+
   List<String>? conSplit;
   List<String>? escaneados;
   String? nombrePersona;
   String? apellidoPersona;
   String? dniPersona;
-  String sexoPersona = "F";
+  String sexoPersona = 'F';
   final controladorDni = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    datosdecargaprovider.versionApp = 'Ok';
+    _cargarEtiquetaSemver();
+  }
+
+  Future<void> _cargarEtiquetaSemver() async {
+    final String s = await InformacionVersionApp.etiquetaSemver();
+    if (!mounted) return;
+    setState(() => _etiquetaSemver = s);
+  }
 
   @override
   void dispose() {
@@ -44,191 +57,317 @@ class _LoginBodyState extends State<LoginBody> {
 
   @override
   Widget build(BuildContext context) {
-    validarVersionNueva();
-    SizeConfiguracion().init(context);
+    final cs = Theme.of(context).colorScheme;
+    final bar = context.sisTipografia;
+    final alturaHeaderLogin = context.escala(
+      compacto: 118.0,
+      normal: 132.0,
+      grande: 146.0,
+    );
+    const superposicionTarjetaLogin = 36.0;
+
     return Stack(
       children: [
         Scaffold(
-          backgroundColor: Colors.white,
+          backgroundColor: cs.surface,
           floatingActionButton: enviromentService.envState!.enviroment == 'DEV'
               ? FloatingActionButton.extended(
                   heroTag: 'botonDesa',
                   icon: const Icon(Icons.perm_data_setting_sharp),
-                  splashColor: Colors.red,
+                  backgroundColor: cs.errorContainer,
+                  foregroundColor: cs.onErrorContainer,
                   label: const Text('DESA'),
                   isExtended: true,
                   tooltip: 'PARA SU USO EN DESARROLLO!',
-                  //Esta condicion haabilita un boton flotante en el login para su ingreso sin escanear un dni.
                   onPressed: () async {
-                    final respUsuario = await usuariosProviers.validarUsuariosNuevo(
-                        '36355149'); //Se inserta un numero de dni de un usuario que esta habilitado dentro del sistema de gestion
+                    final respUsuario = await authRepository
+                        .validarUsuariosNuevo('36355149');
                     registradorService.cargarRegistrador(respUsuario[0]);
                     Navigator.pushAndRemoveUntil(
-                        context,
-                        MaterialPageRoute(
-                            // ignore: missing_required_param
-                            builder: (context) => VacunadorPage(
-                                  infoCargador: respUsuario,
-                                )),
-                        (Route<dynamic> route) => false);
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) =>
+                            VacunadorPage(infoCargador: respUsuario),
+                      ),
+                      (Route<dynamic> route) => false,
+                    );
                   },
                 )
               : null,
-          body: Stack(
-            children: [
-              const EncabezadoWave(),
-              _LoginFormulario(context: context),
-            ],
+          body: SizedBox.expand(
+            child: Stack(
+              children: [
+                MarcaCabeceraGradiente(
+                  titulo: 'Bienvenido',
+                  subtitulo: nombreApp,
+                  alturaMinima: alturaHeaderLogin,
+                ),
+                Positioned.fill(
+                  top:
+                      MediaQuery.paddingOf(context).top +
+                      alturaHeaderLogin -
+                      superposicionTarjetaLogin,
+                  child: SingleChildScrollView(
+                    physics: const BouncingScrollPhysics(),
+                    padding: const EdgeInsets.fromLTRB(
+                      AppEspaciado.lg,
+                      0,
+                      AppEspaciado.lg,
+                      AppEspaciado.lg,
+                    ),
+                    child: Column(
+                      children: [
+                        FadeInUp(
+                          duration: const Duration(milliseconds: 520),
+                          child: const _TarjetaLoginAcceso(),
+                        ),
+                        const SizedBox(height: AppEspaciado.lg),
+                        FadeIn(
+                          delay: const Duration(milliseconds: 200),
+                          child: Wrap(
+                            alignment: WrapAlignment.center,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            spacing: AppEspaciado.sm,
+                            runSpacing: AppEspaciado.xs,
+                            children: <Widget>[
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: AppEspaciado.md,
+                                  vertical: AppEspaciado.xs,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: cs.surfaceContainerHighest.withValues(
+                                    alpha: 0.75,
+                                  ),
+                                  borderRadius: BorderRadius.circular(
+                                    AppEspaciado.radioCampo,
+                                  ),
+                                ),
+                                child: Text(
+                                  'v$_etiquetaSemver',
+                                  style: bar.textoChip.copyWith(
+                                    color: cs.onSurfaceVariant,
+                                  ),
+                                ),
+                              ),
+                              Tooltip(
+                                message: 'Ver novedades de la versión',
+                                child: TextButton.icon(
+                                  style: AppBotones.estiloTextoPequeno(cs),
+                                  onPressed: () =>
+                                      mostrarDialogoNovedadesApp(context),
+                                  icon: const Icon(Icons.article_outlined),
+                                  label: const Text('Novedades'),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: AppEspaciado.sm),
+                        FadeInLeft(
+                          delay: const Duration(milliseconds: 400),
+                          child: Text(
+                            'Para uso interno — Ministerio de Desarrollo Humano',
+                            textAlign: TextAlign.center,
+                            style: bar.textoChip.copyWith(
+                              fontWeight: FontWeight.w500,
+                              color: cs.onSurfaceVariant.withValues(alpha: 0.9),
+                              letterSpacing: 0.2,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  child: SafeArea(
+                    top: false,
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(
+                        AppEspaciado.lg,
+                        0,
+                        AppEspaciado.lg,
+                        AppEspaciado.sm,
+                      ),
+                      child: BounceInUp(
+                        from: 12,
+                        delay: const Duration(milliseconds: 500),
+                        child: Image.asset(
+                          'assets/img/fondo/AZUL_TODOS_UNIDOS.png',
+                          fit: BoxFit.contain,
+                          height: (MediaQuery.sizeOf(context).height * 0.062)
+                              .clamp(36.0, 64.0),
+                          color: Theme.of(context).brightness == Brightness.dark
+                              ? cs.onSurface.withValues(alpha: 0.8)
+                              : null,
+                          colorBlendMode:
+                              Theme.of(context).brightness == Brightness.dark
+                              ? BlendMode.srcIn
+                              : null,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
-        StreamBuilder(
-          stream: loadingLoginService.loadingStateStream,
-          builder: (BuildContext context, AsyncSnapshot<dynamic> snapshot) {
-            return loadingLoginService.getEstadoLoginState!
-                ? Container(
-                    height: double.infinity,
-                    width: double.infinity,
-                    color: Colors.black.withOpacity(.7),
-                    child: const Center(child: LoadingEstrellas()))
-                : loadingLoginService.getEstadoPrimerInicioState!
-                    ? Container()
-                    : FutureBuilder(
-                        future:
-                            Future.delayed(const Duration(milliseconds: 1000)),
-                        builder: (BuildContext context,
-                            AsyncSnapshot<dynamic> snapshot) {
+        ValueListenableBuilder<bool>(
+          valueListenable: loadingLoginService.loadingEstado,
+          builder: (BuildContext context, loading, _) {
+            if (loading) {
+              return Container(
+                height: double.infinity,
+                width: double.infinity,
+                color: cs.scrim.withValues(alpha: .72),
+                child: Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const LoadingEstrellas(),
+                      if (loadingLoginService.loadingMensaje.isNotEmpty) ...[
+                        const SizedBox(height: AppEspaciado.lg),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: AppEspaciado.xxl,
+                          ),
+                          child: Text(
+                            loadingLoginService.loadingMensaje,
+                            textAlign: TextAlign.center,
+                            style: bar.textoPrincipal.copyWith(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              );
+            }
+            return loadingLoginService.getEstadoPrimerInicioState!
+                ? const SizedBox.shrink()
+                : FutureBuilder(
+                    future: Future.delayed(const Duration(milliseconds: 1000)),
+                    builder:
+                        (
+                          BuildContext context,
+                          AsyncSnapshot<dynamic> snapshot,
+                        ) {
                           return snapshot.connectionState ==
                                   ConnectionState.waiting
                               ? Container(
                                   height: double.infinity,
                                   width: double.infinity,
-                                  color: Colors.black.withOpacity(.7),
-                                  child:
-                                      const Center(child: LoadingEstrellas()))
-                              : Container();
+                                  color: cs.scrim.withValues(alpha: .72),
+                                  child: const Center(
+                                    child: LoadingEstrellas(),
+                                  ),
+                                )
+                              : const SizedBox.shrink();
                         },
-                      );
+                  );
           },
         ),
       ],
     );
   }
 
-  validarVersionNueva() async {
-    final versionSv = await validacionVersionProvider
-        .validarVersionNuevaVersion(nombreApp, versionApp);
-    if (versionSv == versionApp) {
-      datosdecargaprovider.versionApp = 'Ok';
-    } else {
-      mostrarAlertaActualizacion(context, 'Debe Actualizar la Aplicación');
-      datosdecargaprovider.versionApp = 'No';
-    }
-  }
-
   void mostrarAlertaActualizacion(BuildContext context, String mensaje) {
-    showDialog(
-        context: context,
-        builder: (context) {
-          return AlertDialog(
-            title: const Text('Información Importante'),
-            content: Text(mensaje),
-            actions: <Widget>[
-              TextButton(
-                child: const Text('OK'),
-                onPressed: _launchURL,
-              )
-            ],
-          );
-        });
+    showDialog<void>(
+      context: context,
+      builder: (BuildContext ctx) => DialogoAlerta(
+        tituloAlerta: 'Actualización disponible',
+        descripcionAlerta: mensaje,
+        icon: Icon(
+          Icons.system_update_alt_rounded,
+          size: AppTamanoIcono.grande,
+        ),
+        color: Theme.of(ctx).colorScheme.primary,
+        dosBotones: !Platform.isIOS,
+        textoBotonAlerta: 'Cerrar',
+        textoBotonAlerta2: 'Descargar APK',
+        envioFuncion1: false,
+        funcion2: !Platform.isIOS
+            ? () {
+                Navigator.of(ctx).pop();
+                _launchURL();
+              }
+            : null,
+      ),
+    );
   }
 
-//Funcion para redirigir al Link de Descarga de la Ultima Aplicacion Disponible
-  _launchURL() async {
+  Future<void> _launchURL() async {
     const url =
         'https://dh.formosa.gob.ar/modulos/webservice/php/version_3_0/v3.0.0.apk';
-    await launch(url);
+    await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
   }
 }
 
-class _LoginFormulario extends StatelessWidget {
-  const _LoginFormulario({
-    Key? key,
-    required this.context,
-  }) : super(key: key);
-
-  final BuildContext context;
+/// Tarjeta principal con logo, llamada a la acción y escáner.
+class _TarjetaLoginAcceso extends StatelessWidget {
+  const _TarjetaLoginAcceso();
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.only(
-          top: MediaQuery.of(context).size.height * 0.15,
-          bottom: MediaQuery.of(context).size.height * 0.01),
+    final cs = Theme.of(context).colorScheme;
+    final bar = context.sisTipografia;
+    final ancho = MediaQuery.sizeOf(context).width;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppEspaciado.xl),
+      decoration: AppSuperficies.tarjeta(
+        context,
+      ).copyWith(borderRadius: BorderRadius.circular(AppEspaciado.radioCampo)),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: <Widget>[
-          FadeInDownBig(
-            from: 40,
-            child: Image(
-              image: const AssetImage('assets/logo/VacunApp2.png'),
-              fit: BoxFit.cover,
-              //height: MediaQuery.of(context).size.height * 0.2,
-              width: MediaQuery.of(context).size.width * .55,
+        children: [
+          Image.asset(
+            Theme.of(context).brightness == Brightness.light
+                ? 'assets/logo/VacunApp2_claro.png'
+                : 'assets/logo/VacunApp2.png',
+            fit: BoxFit.contain,
+            width: ancho * 0.52,
+          ),
+          const SizedBox(height: AppEspaciado.xl),
+          Text(
+            'Acceso al sistema',
+            style: bar.etiquetaSeccion.copyWith(
+              letterSpacing: 1.15,
+              color: cs.onSurfaceVariant,
             ),
           ),
-          SizedBox(height: MediaQuery.of(context).size.height * 0.12),
-          FadeInLeft(
-            from: 40,
-            delay: const Duration(milliseconds: 1100),
-            child: Text('Escanee su D.N.I. para continuar',
-                style: GoogleFonts.nunito(
-                  textStyle: TextStyle(
-                      color: Colors.black87,
-                      fontSize: MediaQuery.of(context).size.height * 0.022,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 2.0),
-                )),
+          const SizedBox(height: AppEspaciado.sm),
+          Text(
+            'Escanee su D.N.I. para continuar',
+            textAlign: TextAlign.center,
+            style: bar.subtituloTarjeta.copyWith(color: cs.onSurface),
           ),
-          SizedBox(height: MediaQuery.of(context).size.width * 0.05),
-          ElasticIn(
-            delay: const Duration(milliseconds: 1500),
-            child: EscanerDni(
-              'Registrador',
-              'Escanear',
-              'Escane el dni para verificar su identidad',
-              iconBool: false,
-              anchoValor: MediaQuery.of(context).size.width * 0.1,
+          const SizedBox(height: AppEspaciado.xs),
+          Text(
+            'Escanee el código del frente (DNI nuevo), del reverso (DNI anterior).',
+            textAlign: TextAlign.center,
+            style: bar.textoSecundario.copyWith(
+              color: cs.onSurfaceVariant.withValues(alpha: 0.95),
             ),
           ),
-          SizedBox(height: MediaQuery.of(context).size.width * 0.05),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12.0),
-            child: FadeInLeft(
-              from: 40,
-              delay: const Duration(milliseconds: 1100),
-              child: Text(
-                  'Para uso interno, del ministerio de desarrollo humano',
-                  textAlign: TextAlign.center,
-                  style: GoogleFonts.nunito(
-                    textStyle: TextStyle(
-                        fontSize: MediaQuery.of(context).size.height * 0.018,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 2.0),
-                  )),
-            ),
-          ),
-          Align(
-            alignment: Alignment.bottomCenter,
-            child: BounceInUp(
-              from: 20,
-              delay: const Duration(milliseconds: 800),
-              child: Image(
-                image:
-                    const AssetImage('assets/img/fondo/AZUL_TODOS_UNIDOS.png'),
-                fit: BoxFit.cover,
-                height: MediaQuery.of(context).size.height * 0.065,
-                // width: MediaQuery.of(context).size.height / 1,
+          const SizedBox(height: AppEspaciado.xl),
+          SizedBox(
+            width: double.infinity,
+            child: ElasticIn(
+              delay: const Duration(milliseconds: 280),
+              child: EscanerDni(
+                'Registrador',
+                'Escanear documento',
+                iconBool: false,
+                anchoValor: ancho * 0.11,
               ),
             ),
           ),

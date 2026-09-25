@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 
+import 'package:sistema_vacunacion/src/config/config.dart';
+
 class BaseButton extends StatelessWidget {
   final Widget child;
   final double? ancho;
+
+  static const double _fraccionAnchoMaximo = 0.9;
 
   const BaseButton({
     Key? key,
@@ -12,10 +16,10 @@ class BaseButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    double mediaQueryWidth = MediaQuery.of(context).size.width * .9;
+    double mediaQueryWidth = MediaQuery.sizeOf(context).width * _fraccionAnchoMaximo;
     double fixedWidth = ancho!;
     return ClipRRect(
-      borderRadius: BorderRadius.circular(6),
+      borderRadius: BorderRadius.circular(AppEspaciado.radioBoton),
       child: SizedBox(
         // height: MediaQuery.of(context).size.height * 0.05,
         width: fixedWidth <= mediaQueryWidth ? fixedWidth : mediaQueryWidth,

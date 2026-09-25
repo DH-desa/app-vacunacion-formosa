@@ -1,0 +1,904 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>API Docs — App Vacunacion Formosa</title>
+  <style>
+    :root {
+      --get:    #2e7d32;
+      --get-bg: #e8f5e9;
+      --post:   #1565c0;
+      --post-bg:#e3f2fd;
+      --warn:   #e65100;
+      --warn-bg:#fff3e0;
+      --bg:     #f5f5f5;
+      --card:   #ffffff;
+      --border: #e0e0e0;
+      --text:   #212121;
+      --muted:  #757575;
+      --code-bg:#263238;
+      --code-fg:#cfd8dc;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); }
+
+    /* ── HEADER ── */
+    header {
+      background: linear-gradient(135deg, #1a237e 0%, #283593 100%);
+      color: #fff; padding: 36px 48px;
+    }
+    header h1 { font-size: 1.8rem; font-weight: 700; }
+    header p  { margin-top: 6px; opacity: .75; font-size: .95rem; }
+    .base-url {
+      display: inline-block; margin-top: 14px;
+      background: rgba(255,255,255,.12); border-radius: 6px;
+      padding: 6px 14px; font-family: monospace; font-size: .9rem;
+    }
+
+    /* ── ALERTS ── */
+    .alert {
+      margin: 24px 48px 0;
+      border-left: 4px solid var(--warn);
+      background: var(--warn-bg);
+      border-radius: 6px; padding: 12px 16px;
+      font-size: .875rem; color: var(--warn);
+    }
+    .alert strong { display: block; margin-bottom: 4px; font-size: .9rem; }
+
+    /* ── LAYOUT ── */
+    main { padding: 32px 48px; max-width: 1100px; margin: 0 auto; }
+
+    /* ── SECTION TITLE ── */
+    .section-title {
+      font-size: .7rem; font-weight: 700; letter-spacing: .12em;
+      text-transform: uppercase; color: var(--muted);
+      margin: 36px 0 12px; padding-bottom: 6px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    /* ── ENDPOINT CARD ── */
+    .card {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 10px; margin-bottom: 16px; overflow: hidden;
+    }
+    .card-header {
+      display: flex; align-items: center; gap: 12px;
+      padding: 14px 20px; cursor: pointer;
+      user-select: none;
+    }
+    .card-header:hover { background: #fafafa; }
+
+    .badge {
+      font-size: .7rem; font-weight: 800; letter-spacing: .06em;
+      padding: 3px 9px; border-radius: 4px; min-width: 48px;
+      text-align: center; flex-shrink: 0;
+    }
+    .badge.get  { background: var(--get-bg);  color: var(--get);  }
+    .badge.post { background: var(--post-bg); color: var(--post); }
+
+    .card-header .path {
+      font-family: monospace; font-size: .85rem; color: #5c6bc0;
+      flex: 1; word-break: break-all;
+    }
+    .card-header .title { font-size: .9rem; font-weight: 600; flex: 1; }
+    .chevron { margin-left: auto; color: var(--muted); transition: transform .2s; }
+    .card.open .chevron { transform: rotate(180deg); }
+
+    .card-body { display: none; padding: 0 20px 20px; border-top: 1px solid var(--border); }
+    .card.open .card-body { display: block; }
+
+    /* ── TABS ── */
+    .tabs { display: flex; gap: 4px; margin: 16px 0 12px; }
+    .tab {
+      padding: 5px 14px; border-radius: 6px; font-size: .8rem;
+      font-weight: 600; cursor: pointer; border: 1px solid var(--border);
+      background: #fff; color: var(--muted);
+    }
+    .tab.active { background: #1a237e; color: #fff; border-color: #1a237e; }
+
+    .tab-pane { display: none; }
+    .tab-pane.active { display: block; }
+
+    /* ── PARAMS TABLE ── */
+    table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+    th {
+      background: #eceff1; text-align: left;
+      padding: 8px 12px; font-size: .75rem; font-weight: 700;
+      letter-spacing: .05em; text-transform: uppercase; color: var(--muted);
+    }
+    td { padding: 8px 12px; border-bottom: 1px solid #f0f0f0; }
+    tr:last-child td { border-bottom: none; }
+    .required { color: #c62828; font-size: .72rem; font-weight: 700; }
+    .optional { color: #558b2f; font-size: .72rem; font-weight: 700; }
+    code.inline {
+      background: #eceff1; border-radius: 3px;
+      padding: 1px 5px; font-family: monospace; font-size: .82rem;
+    }
+
+    /* ── CODE BLOCK ── */
+    pre {
+      background: var(--code-bg); color: var(--code-fg);
+      border-radius: 8px; padding: 16px; overflow-x: auto;
+      font-size: .8rem; line-height: 1.6;
+    }
+    .copy-btn {
+      float: right; margin-bottom: 6px;
+      background: rgba(255,255,255,.1); border: none; color: #cfd8dc;
+      border-radius: 4px; padding: 3px 10px; font-size: .75rem;
+      cursor: pointer;
+    }
+    .copy-btn:hover { background: rgba(255,255,255,.2); }
+
+    /* ── WARNING TAG ── */
+    .tag-warn {
+      display: inline-block; font-size: .7rem; font-weight: 700;
+      background: var(--warn-bg); color: var(--warn);
+      border-radius: 4px; padding: 2px 7px; margin-left: 6px;
+    }
+
+    /* ── FOOTER ── */
+    footer {
+      text-align: center; padding: 32px;
+      font-size: .8rem; color: var(--muted);
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>API Docs &mdash; App Vacunacion Formosa</h1>
+  <p>Documentacion interna de endpoints &mdash; version 3.0</p>
+  <div class="base-url">https://dh.formosa.gob.ar/modulos/webservice/php/</div>
+</header>
+
+<div class="alert">
+  <strong>&#9888; Sin autenticacion</strong>
+  Todos los endpoints son publicos. No se requiere token, API Key ni header de autorizacion. Cualquier peticion con los parametros correctos devuelve datos sensibles.
+</div>
+
+<main>
+
+  <!-- ════════════════════════════════════════
+       SECCION: SISTEMA
+  ════════════════════════════════════════ -->
+  <div class="section-title">Sistema</div>
+
+  <!-- Validar version -->
+  <div class="card" id="card-version">
+    <div class="card-header" onclick="toggle('card-version')">
+      <span class="badge get">GET</span>
+      <span class="path">versionapp/wserv_versiones_app.php</span>
+      <span class="title">Validar version de la app</span>
+      <span class="chevron">&#9660;</span>
+    </div>
+    <div class="card-body">
+      <div class="tabs">
+        <div class="tab active" onclick="showTab(this,'version','params')">Parametros</div>
+        <div class="tab" onclick="showTab(this,'version','curl')">cURL</div>
+        <div class="tab" onclick="showTab(this,'version','response')">Respuesta</div>
+      </div>
+
+      <div class="tab-pane active" id="version-params">
+        <table>
+          <tr><th>Parametro</th><th>Tipo</th><th>Req.</th><th>Descripcion</th></tr>
+          <tr><td><code class="inline">sysappl01_nombre</code></td><td>String</td><td><span class="required">SI</span></td><td>Nombre de la app (ej: <code class="inline">vacunacion</code>)</td></tr>
+          <tr><td><code class="inline">sysappl01_version</code></td><td>String</td><td><span class="required">SI</span></td><td>Version actual (ej: <code class="inline">3.0.0</code>)</td></tr>
+        </table>
+      </div>
+      <div class="tab-pane" id="version-curl">
+        <button class="copy-btn" onclick="copyCode(this)">Copiar</button>
+        <pre>curl "https://dh.formosa.gob.ar/modulos/webservice/php/versionapp/wserv_versiones_app.php?sysappl01_nombre=vacunacion&amp;sysappl01_version=3.0.0"</pre>
+      </div>
+      <div class="tab-pane" id="version-response">
+        <pre>{
+  "versiones": [
+    {
+      "sysappl01_nombre": "vacunacion",
+      "sysappl01_version": "3.0.0",
+      "codigo_mensaje": "0",
+      "mensaje": "OK"
+    }
+  ]
+}</pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════
+       SECCION: AUTENTICACION
+  ════════════════════════════════════════ -->
+  <div class="section-title">Autenticacion</div>
+
+  <!-- Login -->
+  <div class="card" id="card-login">
+    <div class="card-header" onclick="toggle('card-login')">
+      <span class="badge get">GET</span>
+      <span class="path">version_2_0/wserv_login.php</span>
+      <span class="title">Login <span class="tag-warn">v2</span></span>
+      <span class="chevron">&#9660;</span>
+    </div>
+    <div class="card-body">
+      <div class="tabs">
+        <div class="tab active" onclick="showTab(this,'login','params')">Parametros</div>
+        <div class="tab" onclick="showTab(this,'login','curl')">cURL</div>
+        <div class="tab" onclick="showTab(this,'login','response')">Respuesta</div>
+      </div>
+      <div class="tab-pane active" id="login-params">
+        <table>
+          <tr><th>Parametro</th><th>Tipo</th><th>Req.</th><th>Descripcion</th></tr>
+          <tr><td><code class="inline">flxcore03_dni</code></td><td>String</td><td><span class="required">SI</span></td><td>DNI del usuario registrador</td></tr>
+        </table>
+      </div>
+      <div class="tab-pane" id="login-curl">
+        <button class="copy-btn" onclick="copyCode(this)">Copiar</button>
+        <pre>curl "https://dh.formosa.gob.ar/modulos/webservice/php/version_2_0/wserv_login.php?flxcore03_dni=36355149"</pre>
+      </div>
+      <div class="tab-pane" id="login-response">
+        <pre>{
+  "usuario": [
+    {
+      "id_flxcore03": "123",
+      "flxcore03_dni": "36355149",
+      "flxcore03_nombre": "NOMBRE APELLIDO",
+      "codigo_mensaje": "0",
+      "mensaje": "OK"
+    }
+  ]
+}</pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- Registrador / Efector -->
+  <div class="card" id="card-efect">
+    <div class="card-header" onclick="toggle('card-efect')">
+      <span class="badge get">GET</span>
+      <span class="path">version_3_0/wserv_efector_registrador.php</span>
+      <span class="title">Obtener Registrador / Efector</span>
+      <span class="chevron">&#9660;</span>
+    </div>
+    <div class="card-body">
+      <div class="tabs">
+        <div class="tab active" onclick="showTab(this,'efect','params')">Parametros</div>
+        <div class="tab" onclick="showTab(this,'efect','curl')">cURL</div>
+        <div class="tab" onclick="showTab(this,'efect','response')">Respuesta</div>
+      </div>
+      <div class="tab-pane active" id="efect-params">
+        <table>
+          <tr><th>Parametro</th><th>Tipo</th><th>Req.</th><th>Descripcion</th></tr>
+          <tr><td><code class="inline">flxcore03_dni</code></td><td>String</td><td><span class="required">SI</span></td><td>DNI del registrador</td></tr>
+        </table>
+      </div>
+      <div class="tab-pane" id="efect-curl">
+        <button class="copy-btn" onclick="copyCode(this)">Copiar</button>
+        <pre>curl "https://dh.formosa.gob.ar/modulos/webservice/php/version_3_0/wserv_efector_registrador.php?flxcore03_dni=36355149"</pre>
+      </div>
+      <div class="tab-pane" id="efect-response">
+        <pre>{
+  "usuario": [
+    {
+      "id_flxcore03": "123",
+      "flxcore03_dni": "36355149",
+      "flxcore03_nombre": "NOMBRE APELLIDO",
+      "rela_sysofic01": "456",
+      "sysofic01_descripcion": "Hospital Central",
+      "codigo_mensaje": "0",
+      "mensaje": "OK"
+    }
+  ]
+}</pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- Vacunador -->
+  <div class="card" id="card-vacunador">
+    <div class="card-header" onclick="toggle('card-vacunador')">
+      <span class="badge get">GET</span>
+      <span class="path">version_3_0/wserv_vacunador.php</span>
+      <span class="title">Obtener Vacunador</span>
+      <span class="chevron">&#9660;</span>
+    </div>
+    <div class="card-body">
+      <div class="tabs">
+        <div class="tab active" onclick="showTab(this,'vacunador','params')">Parametros</div>
+        <div class="tab" onclick="showTab(this,'vacunador','curl')">cURL</div>
+        <div class="tab" onclick="showTab(this,'vacunador','response')">Respuesta</div>
+      </div>
+      <div class="tab-pane active" id="vacunador-params">
+        <table>
+          <tr><th>Parametro</th><th>Tipo</th><th>Req.</th><th>Descripcion</th></tr>
+          <tr><td><code class="inline">sysdesa06_nro_documento</code></td><td>String</td><td><span class="required">SI</span></td><td>DNI del vacunador</td></tr>
+        </table>
+      </div>
+      <div class="tab-pane" id="vacunador-curl">
+        <button class="copy-btn" onclick="copyCode(this)">Copiar</button>
+        <pre>curl "https://dh.formosa.gob.ar/modulos/webservice/php/version_3_0/wserv_vacunador.php?sysdesa06_nro_documento=12345678"</pre>
+      </div>
+      <div class="tab-pane" id="vacunador-response">
+        <pre>{
+  "vacunador": [
+    {
+      "id_sysdesa12": "789",
+      "sysdesa06_nro_documento": "12345678",
+      "sysdesa06_nombre": "NOMBRE VACUNADOR",
+      "codigo_mensaje": "0",
+      "mensaje": "OK"
+    }
+  ]
+}</pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════
+       SECCION: BENEFICIARIO
+  ════════════════════════════════════════ -->
+  <div class="section-title">Beneficiario</div>
+
+  <!-- Datos beneficiario -->
+  <div class="card" id="card-benef">
+    <div class="card-header" onclick="toggle('card-benef')">
+      <span class="badge get">GET</span>
+      <span class="path">version_3_0/wserv_obtener_datos_beneficiario.php</span>
+      <span class="title">Obtener datos del beneficiario</span>
+      <span class="chevron">&#9660;</span>
+    </div>
+    <div class="card-body">
+      <div class="tabs">
+        <div class="tab active" onclick="showTab(this,'benef','params')">Parametros</div>
+        <div class="tab" onclick="showTab(this,'benef','curl')">cURL</div>
+        <div class="tab" onclick="showTab(this,'benef','response')">Respuesta</div>
+      </div>
+      <div class="tab-pane active" id="benef-params">
+        <table>
+          <tr><th>Parametro</th><th>Tipo</th><th>Req.</th><th>Descripcion</th></tr>
+          <tr><td><code class="inline">sysdesa10_dni</code></td><td>String</td><td><span class="required">SI</span></td><td>DNI del beneficiario</td></tr>
+          <tr><td><code class="inline">sysdesa10_sexo</code></td><td>String</td><td><span class="required">SI</span></td><td><code class="inline">M</code> o <code class="inline">F</code></td></tr>
+          <tr><td><code class="inline">sysdesa10_cadena_dni</code></td><td>String</td><td><span class="optional">NO</span></td><td>DNI en formato barcode</td></tr>
+        </table>
+      </div>
+      <div class="tab-pane" id="benef-curl">
+        <button class="copy-btn" onclick="copyCode(this)">Copiar</button>
+        <pre>curl "https://dh.formosa.gob.ar/modulos/webservice/php/version_3_0/wserv_obtener_datos_beneficiario.php?sysdesa10_dni=12345678&amp;sysdesa10_sexo=M&amp;sysdesa10_cadena_dni=00012345678"</pre>
+      </div>
+      <div class="tab-pane" id="benef-response">
+        <pre>{
+  "beneficiario": [
+    {
+      "sysdesa10_apellido": "APELLIDO",
+      "sysdesa10_nombre": "NOMBRE",
+      "sysdesa10_dni": "12345678",
+      "sysdesa10_sexo": "M",
+      "sysdesa10_fecha_nacimiento": "01/01/1990",
+      "sysdesa10_edad": "35",
+      "sysdesa10_cadena_dni": "00012345678",
+      "sysdesa10_nro_tramite": "123456789",
+      "sysdesa10_cuil": "20123456789",
+      "foto_beneficiario": "data:image/jpeg;base64,...",
+      "codigo_mensaje": "0",
+      "mensaje": "OK"
+    }
+  ]
+}</pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- Historial de vacunas -->
+  <div class="card" id="card-noti">
+    <div class="card-header" onclick="toggle('card-noti')">
+      <span class="badge get">GET</span>
+      <span class="path">version_3_0/obtener_aplicaciones_beneficiario.php</span>
+      <span class="title">Historial de vacunas del beneficiario <span class="tag-warn">Sin auth</span></span>
+      <span class="chevron">&#9660;</span>
+    </div>
+    <div class="card-body">
+      <div class="tabs">
+        <div class="tab active" onclick="showTab(this,'noti','params')">Parametros</div>
+        <div class="tab" onclick="showTab(this,'noti','curl')">cURL</div>
+        <div class="tab" onclick="showTab(this,'noti','response')">Respuesta</div>
+        <div class="tab" onclick="showTab(this,'noti','notas')">Notas</div>
+      </div>
+      <div class="tab-pane active" id="noti-params">
+        <table>
+          <tr><th>Parametro</th><th>Tipo</th><th>Req.</th><th>Descripcion</th></tr>
+          <tr><td><code class="inline">sysdesa10_dni</code></td><td>String</td><td><span class="required">SI</span></td><td>DNI del beneficiario</td></tr>
+          <tr><td><code class="inline">sysdesa10_sexo</code></td><td>String</td><td><span class="required">SI</span></td><td><code class="inline">M</code> o <code class="inline">F</code></td></tr>
+        </table>
+      </div>
+      <div class="tab-pane" id="noti-curl">
+        <button class="copy-btn" onclick="copyCode(this)">Copiar</button>
+        <pre>curl "https://dh.formosa.gob.ar/modulos/webservice/php/version_3_0/obtener_aplicaciones_beneficiario.php?sysdesa10_dni=12345678&amp;sysdesa10_sexo=M"</pre>
+      </div>
+      <div class="tab-pane" id="noti-response">
+        <pre>// codigo_mensaje "1" = hay registros | "0" = sin registros (invertido vs el resto)
+{
+  "aplicaciones_beneficiario": [
+    {
+      "sysvacu04_nombre": "COVID-19",
+      "sysvacu05_nombre": "1ra Dosis",
+      "sysdesa10_fecha_aplicacion": "2021-05-10",
+      "fecha_proxima_dosis": "2021-06-10",
+      "dias_transcurridos": "365",
+      "sysdesa18_lote": "LOTE-001",
+      "sysvacu03_tiempo_interdosis": "30",
+      "codigo_mensaje": "1",
+      "mensaje": "OK"
+    }
+  ]
+}</pre>
+      </div>
+      <div class="tab-pane" id="noti-notas">
+        <table>
+          <tr><th>Problema</th><th>Detalle</th></tr>
+          <tr><td>Sin autenticacion</td><td>Solo requiere DNI + sexo. Cualquier persona puede consultar el historial de salud de otra.</td></tr>
+          <tr><td><code class="inline">codigo_mensaje</code> invertido</td><td><code class="inline">"1"</code> = hay vacunas. En el resto de endpoints <code class="inline">"0"</code> = exito.</td></tr>
+          <tr><td>Campos ausentes</td><td>No retorna: efector/vacunador que aplico, esquema, estado de la dosis.</td></tr>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════
+       SECCION: VACUNAS
+  ════════════════════════════════════════ -->
+  <div class="section-title">Vacunas</div>
+
+  <!-- Vacunas configuradas -->
+  <div class="card" id="card-infovac">
+    <div class="card-header" onclick="toggle('card-infovac')">
+      <span class="badge get">GET</span>
+      <span class="path">version_3_0/wserv_obtener_vacunas_configuradas.php</span>
+      <span class="title">Vacunas configuradas</span>
+      <span class="chevron">&#9660;</span>
+    </div>
+    <div class="card-body">
+      <div class="tabs">
+        <div class="tab active" onclick="showTab(this,'infovac','params')">Parametros</div>
+        <div class="tab" onclick="showTab(this,'infovac','curl')">cURL</div>
+        <div class="tab" onclick="showTab(this,'infovac','response')">Respuesta</div>
+      </div>
+      <div class="tab-pane active" id="infovac-params">
+        <table>
+          <tr><th>Parametro</th><th>Tipo</th><th>Req.</th><th>Descripcion</th></tr>
+          <tr><td><code class="inline">sysdesa10_dni</code></td><td>String</td><td><span class="required">SI</span></td><td>DNI del beneficiario</td></tr>
+          <tr><td><code class="inline">sysdesa10_sexo</code></td><td>String</td><td><span class="required">SI</span></td><td><code class="inline">M</code> o <code class="inline">F</code></td></tr>
+        </table>
+      </div>
+      <div class="tab-pane" id="infovac-curl">
+        <button class="copy-btn" onclick="copyCode(this)">Copiar</button>
+        <pre>curl "https://dh.formosa.gob.ar/modulos/webservice/php/version_3_0/wserv_obtener_vacunas_configuradas.php?sysdesa10_dni=12345678&amp;sysdesa10_sexo=M"</pre>
+      </div>
+      <div class="tab-pane" id="infovac-response">
+        <pre>{
+  "vacunas_configuradas": [
+    {
+      "id_sysvacu04": "1",
+      "sysvacu04_nombre": "COVID-19",
+      "codigo_mensaje": "0",
+      "mensaje": "OK"
+    }
+  ]
+}</pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- Lotes -->
+  <div class="card" id="card-lote">
+    <div class="card-header" onclick="toggle('card-lote')">
+      <span class="badge get">GET</span>
+      <span class="path">version_3_0/wserv_obtener_lotes_vacunas.php</span>
+      <span class="title">Lotes de vacuna</span>
+      <span class="chevron">&#9660;</span>
+    </div>
+    <div class="card-body">
+      <div class="tabs">
+        <div class="tab active" onclick="showTab(this,'lote','params')">Parametros</div>
+        <div class="tab" onclick="showTab(this,'lote','curl')">cURL</div>
+        <div class="tab" onclick="showTab(this,'lote','response')">Respuesta</div>
+      </div>
+      <div class="tab-pane active" id="lote-params">
+        <table>
+          <tr><th>Parametro</th><th>Tipo</th><th>Req.</th><th>Descripcion</th></tr>
+          <tr><td><code class="inline">id_sysvacu04</code></td><td>String</td><td><span class="required">SI</span></td><td>ID de la vacuna (obtenido de vacunas configuradas)</td></tr>
+        </table>
+      </div>
+      <div class="tab-pane" id="lote-curl">
+        <button class="copy-btn" onclick="copyCode(this)">Copiar</button>
+        <pre>curl "https://dh.formosa.gob.ar/modulos/webservice/php/version_3_0/wserv_obtener_lotes_vacunas.php?id_sysvacu04=1"</pre>
+      </div>
+      <div class="tab-pane" id="lote-response">
+        <pre>{
+  "lotes_vacunas": [
+    {
+      "id_sysdesa18": "10",
+      "sysdesa18_lote": "LOTE-001",
+      "sysdesa18_cantidad_actual": "500",
+      "sysdesa18_fecha_vencimiento": "2026-12-31",
+      "sysvacu02_descripcion": "Esquema Completo",
+      "codigo_mensaje": "0",
+      "mensaje": "OK"
+    }
+  ]
+}</pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- Condicion -->
+  <div class="card" id="card-cond">
+    <div class="card-header" onclick="toggle('card-cond')">
+      <span class="badge get">GET</span>
+      <span class="path">version_3_0/wserv_obtener_condicion_vacunas.php</span>
+      <span class="title">Condicion de vacuna</span>
+      <span class="chevron">&#9660;</span>
+    </div>
+    <div class="card-body">
+      <div class="tabs">
+        <div class="tab active" onclick="showTab(this,'cond','params')">Parametros</div>
+        <div class="tab" onclick="showTab(this,'cond','curl')">cURL</div>
+        <div class="tab" onclick="showTab(this,'cond','response')">Respuesta</div>
+      </div>
+      <div class="tab-pane active" id="cond-params">
+        <table>
+          <tr><th>Parametro</th><th>Tipo</th><th>Req.</th><th>Descripcion</th></tr>
+          <tr><td><code class="inline">id_sysvacu04</code></td><td>String</td><td><span class="required">SI</span></td><td>ID de la vacuna</td></tr>
+          <tr><td><code class="inline">sysdesa10_edad</code></td><td>String</td><td><span class="required">SI</span></td><td>Edad del beneficiario</td></tr>
+        </table>
+      </div>
+      <div class="tab-pane" id="cond-curl">
+        <button class="copy-btn" onclick="copyCode(this)">Copiar</button>
+        <pre>curl "https://dh.formosa.gob.ar/modulos/webservice/php/version_3_0/wserv_obtener_condicion_vacunas.php?id_sysvacu04=1&amp;sysdesa10_edad=35"</pre>
+      </div>
+      <div class="tab-pane" id="cond-response">
+        <pre>{
+  "condicion_vacunas": [
+    {
+      "id_sysvacu01": "2",
+      "sysvacu01_descripcion": "Normal",
+      "codigo_mensaje": "0",
+      "mensaje": "OK"
+    }
+  ]
+}</pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- Esquema -->
+  <div class="card" id="card-esq">
+    <div class="card-header" onclick="toggle('card-esq')">
+      <span class="badge get">GET</span>
+      <span class="path">version_3_0/wserv_obtener_esquema_vacunas.php</span>
+      <span class="title">Esquema de vacunacion</span>
+      <span class="chevron">&#9660;</span>
+    </div>
+    <div class="card-body">
+      <div class="tabs">
+        <div class="tab active" onclick="showTab(this,'esq','params')">Parametros</div>
+        <div class="tab" onclick="showTab(this,'esq','curl')">cURL</div>
+        <div class="tab" onclick="showTab(this,'esq','response')">Respuesta</div>
+      </div>
+      <div class="tab-pane active" id="esq-params">
+        <table>
+          <tr><th>Parametro</th><th>Tipo</th><th>Req.</th><th>Descripcion</th></tr>
+          <tr><td><code class="inline">id_sysvacu04</code></td><td>String</td><td><span class="required">SI</span></td><td>ID de la vacuna</td></tr>
+          <tr><td><code class="inline">id_sysvacu01</code></td><td>String</td><td><span class="required">SI</span></td><td>ID de la condicion</td></tr>
+        </table>
+      </div>
+      <div class="tab-pane" id="esq-curl">
+        <button class="copy-btn" onclick="copyCode(this)">Copiar</button>
+        <pre>curl "https://dh.formosa.gob.ar/modulos/webservice/php/version_3_0/wserv_obtener_esquema_vacunas.php?id_sysvacu04=1&amp;id_sysvacu01=2"</pre>
+      </div>
+      <div class="tab-pane" id="esq-response">
+        <pre>{
+  "esquema_vacunas": [
+    {
+      "id_sysvacu02": "3",
+      "sysvacu02_descripcion": "Esquema Completo",
+      "codigo_mensaje": "0",
+      "mensaje": "OK"
+    }
+  ]
+}</pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- Dosis -->
+  <div class="card" id="card-dosis">
+    <div class="card-header" onclick="toggle('card-dosis')">
+      <span class="badge get">GET</span>
+      <span class="path">version_3_0/wserv_obtener_dosis_vacunas.php</span>
+      <span class="title">Dosis de vacuna</span>
+      <span class="chevron">&#9660;</span>
+    </div>
+    <div class="card-body">
+      <div class="tabs">
+        <div class="tab active" onclick="showTab(this,'dosis','params')">Parametros</div>
+        <div class="tab" onclick="showTab(this,'dosis','curl')">cURL</div>
+        <div class="tab" onclick="showTab(this,'dosis','response')">Respuesta</div>
+      </div>
+      <div class="tab-pane active" id="dosis-params">
+        <table>
+          <tr><th>Parametro</th><th>Tipo</th><th>Req.</th><th>Descripcion</th></tr>
+          <tr><td><code class="inline">id_sysvacu04</code></td><td>String</td><td><span class="required">SI</span></td><td>ID de la vacuna</td></tr>
+          <tr><td><code class="inline">id_sysvacu01</code></td><td>String</td><td><span class="required">SI</span></td><td>ID de la condicion</td></tr>
+          <tr><td><code class="inline">id_sysvacu02</code></td><td>String</td><td><span class="required">SI</span></td><td>ID del esquema</td></tr>
+        </table>
+      </div>
+      <div class="tab-pane" id="dosis-curl">
+        <button class="copy-btn" onclick="copyCode(this)">Copiar</button>
+        <pre>curl "https://dh.formosa.gob.ar/modulos/webservice/php/version_3_0/wserv_obtener_dosis_vacunas.php?id_sysvacu04=1&amp;id_sysvacu01=2&amp;id_sysvacu02=3"</pre>
+      </div>
+      <div class="tab-pane" id="dosis-response">
+        <pre>{
+  "dosis_vacunas": [
+    {
+      "id_sysvacu05": "4",
+      "sysvacu05_nombre": "1ra Dosis",
+      "sysvacu05_orden": "1",
+      "codigo_mensaje": "0",
+      "mensaje": "OK"
+    }
+  ]
+}</pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- Config vacuna -->
+  <div class="card" id="card-config">
+    <div class="card-header" onclick="toggle('card-config')">
+      <span class="badge get">GET</span>
+      <span class="path">version_3_0/wserv_obtener_configuraciones_vacuna.php</span>
+      <span class="title">Configuracion completa de vacuna</span>
+      <span class="chevron">&#9660;</span>
+    </div>
+    <div class="card-body">
+      <div class="tabs">
+        <div class="tab active" onclick="showTab(this,'config','params')">Parametros</div>
+        <div class="tab" onclick="showTab(this,'config','curl')">cURL</div>
+        <div class="tab" onclick="showTab(this,'config','response')">Respuesta</div>
+      </div>
+      <div class="tab-pane active" id="config-params">
+        <table>
+          <tr><th>Parametro</th><th>Tipo</th><th>Req.</th><th>Descripcion</th></tr>
+          <tr><td><code class="inline">id_sysvacu04</code></td><td>String</td><td><span class="required">SI</span></td><td>ID de la vacuna</td></tr>
+          <tr><td><code class="inline">sysdesa10_edad</code></td><td>String</td><td><span class="required">SI</span></td><td>Edad del beneficiario</td></tr>
+          <tr><td><code class="inline">sysdesa10_dni</code></td><td>String</td><td><span class="required">SI</span></td><td>DNI del beneficiario</td></tr>
+          <tr><td><code class="inline">sysdesa10_sexo</code></td><td>String</td><td><span class="required">SI</span></td><td><code class="inline">M</code> o <code class="inline">F</code></td></tr>
+        </table>
+      </div>
+      <div class="tab-pane" id="config-curl">
+        <button class="copy-btn" onclick="copyCode(this)">Copiar</button>
+        <pre>curl "https://dh.formosa.gob.ar/modulos/webservice/php/version_3_0/wserv_obtener_configuraciones_vacuna.php?id_sysvacu04=1&amp;sysdesa10_edad=35&amp;sysdesa10_dni=12345678&amp;sysdesa10_sexo=M"</pre>
+      </div>
+      <div class="tab-pane" id="config-response">
+        <pre>{
+  "configuraciones": [
+    {
+      "id_sysvacu03": "5",
+      "sysvacu01_descripcion": "Normal",
+      "sysvacu02_descripcion": "Esquema Completo",
+      "sysvacu05_nombre": "1ra Dosis",
+      "sysvacu06_denominacion": "COVID-19 BNT162b2",
+      "sysvacu05_orden": "1",
+      "codigo_mensaje": "0",
+      "mensaje": "OK"
+    }
+  ]
+}</pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- Perfiles -->
+  <div class="card" id="card-perfil">
+    <div class="card-header" onclick="toggle('card-perfil')">
+      <span class="badge get">GET</span>
+      <span class="path">version_3_0/wserv_obtener_perfil_vacunacion.php</span>
+      <span class="title">Perfiles de vacunacion</span>
+      <span class="chevron">&#9660;</span>
+    </div>
+    <div class="card-body">
+      <div class="tabs">
+        <div class="tab active" onclick="showTab(this,'perfil','params')">Parametros</div>
+        <div class="tab" onclick="showTab(this,'perfil','curl')">cURL</div>
+        <div class="tab" onclick="showTab(this,'perfil','response')">Respuesta</div>
+      </div>
+      <div class="tab-pane active" id="perfil-params">
+        <table>
+          <tr><th>Parametro</th><th>Tipo</th><th>Req.</th><th>Descripcion</th></tr>
+          <tr><td><code class="inline">rela_flxcore03</code></td><td>String</td><td><span class="required">SI</span></td><td>ID de relacion del registrador (viene del login)</td></tr>
+        </table>
+      </div>
+      <div class="tab-pane" id="perfil-curl">
+        <button class="copy-btn" onclick="copyCode(this)">Copiar</button>
+        <pre>curl "https://dh.formosa.gob.ar/modulos/webservice/php/version_3_0/wserv_obtener_perfil_vacunacion.php?rela_flxcore03=123"</pre>
+      </div>
+      <div class="tab-pane" id="perfil-response">
+        <pre>{
+  "perfiles_vacunacion": [
+    {
+      "id_sysvacu12": "6",
+      "sysvacu12_descripcion": "Perfil General",
+      "codigo_mensaje": "0",
+      "mensaje": "OK"
+    }
+  ]
+}</pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════
+       SECCION: REGISTRO
+  ════════════════════════════════════════ -->
+  <div class="section-title">Registro</div>
+
+  <!-- Registrar vacuna -->
+  <div class="card" id="card-reg">
+    <div class="card-header" onclick="toggle('card-reg')">
+      <span class="badge post">POST</span>
+      <span class="path">version_3_0/wserv_registrar_vacuna.php</span>
+      <span class="title">Registrar vacuna aplicada</span>
+      <span class="chevron">&#9660;</span>
+    </div>
+    <div class="card-body">
+      <div class="tabs">
+        <div class="tab active" onclick="showTab(this,'reg','params')">Parametros</div>
+        <div class="tab" onclick="showTab(this,'reg','curl')">cURL</div>
+        <div class="tab" onclick="showTab(this,'reg','response')">Respuesta</div>
+        <div class="tab" onclick="showTab(this,'reg','notas')">Notas</div>
+      </div>
+      <div class="tab-pane active" id="reg-params">
+        <p style="font-size:.82rem;color:var(--muted);margin-bottom:10px;">
+          Content-Type: <code class="inline">application/x-www-form-urlencoded</code> &mdash;
+          Se envia un unico campo <code class="inline">insertvacunado</code> cuyo valor es el JSON serializado como string.
+        </p>
+        <table>
+          <tr><th>Campo JSON</th><th>Tipo</th><th>Descripcion</th></tr>
+          <tr><td><code class="inline">id_flxcore03</code></td><td>String</td><td>ID del registrador (del login)</td></tr>
+          <tr><td><code class="inline">id_sysvacu04</code></td><td>String</td><td>ID de la vacuna</td></tr>
+          <tr><td><code class="inline">id_sysofic01</code></td><td>String</td><td>ID del efector</td></tr>
+          <tr><td><code class="inline">id_sysdesa18</code></td><td>String</td><td>ID del lote</td></tr>
+          <tr><td><code class="inline">id_sysdesa12</code></td><td>String</td><td>ID del vacunador</td></tr>
+          <tr><td><code class="inline">id_sysvacu01</code></td><td>String</td><td>ID de la condicion</td></tr>
+          <tr><td><code class="inline">id_sysvacu02</code></td><td>String</td><td>ID del esquema</td></tr>
+          <tr><td><code class="inline">id_sysvacu05</code></td><td>String</td><td>ID de la dosis</td></tr>
+          <tr><td><code class="inline">sysdesa10_nombre</code></td><td>String</td><td>Nombre del beneficiario</td></tr>
+          <tr><td><code class="inline">sysdesa10_apellido</code></td><td>String</td><td>Apellido del beneficiario</td></tr>
+          <tr><td><code class="inline">sysdesa10_dni</code></td><td>String</td><td>DNI del beneficiario</td></tr>
+          <tr><td><code class="inline">sysdesa10_sexo</code></td><td>String</td><td><code class="inline">M</code> o <code class="inline">F</code></td></tr>
+          <tr><td><code class="inline">sysdesa10_nro_tramite</code></td><td>String</td><td>Numero de tramite del DNI</td></tr>
+          <tr><td><code class="inline">sysdesa10_cadena_dni</code></td><td>String</td><td>DNI en formato barcode</td></tr>
+          <tr><td><code class="inline">sysdesa10_edad</code></td><td>String</td><td>Edad del beneficiario</td></tr>
+          <tr><td><code class="inline">sysdesa10_fecha_nacimiento</code></td><td>String</td><td>Fecha de nacimiento (dd/mm/yyyy)</td></tr>
+          <tr><td><code class="inline">vacunador_registrador</code></td><td>String</td><td><code class="inline">0</code> = vacunador aplica | <code class="inline">1</code> = registrador aplica</td></tr>
+          <tr><td><code class="inline">vacunacion_en_terreno</code></td><td>String</td><td><code class="inline">1</code> = vacunación en terreno (campaña / salida) | <code class="inline">0</code> = en establecimiento fijo. Indicado en la pantalla Equipo de trabajo.</td></tr>
+          <tr><td><code class="inline">sysdesa10_apellido_tutor</code></td><td>String</td><td>Apellido del tutor (menores)</td></tr>
+          <tr><td><code class="inline">sysdesa10_nombre_tutor</code></td><td>String</td><td>Nombre del tutor (menores)</td></tr>
+          <tr><td><code class="inline">sysdesa10_dni_tutor</code></td><td>String</td><td>DNI del tutor (menores)</td></tr>
+          <tr><td><code class="inline">sysdesa10_sexo_tutor</code></td><td>String</td><td>Sexo del tutor (menores)</td></tr>
+          <tr><td><code class="inline">fecha_aplicacion</code></td><td>String</td><td>Fecha de aplicacion (dd/mm/yyyy)</td></tr>
+        </table>
+      </div>
+      <div class="tab-pane" id="reg-curl">
+        <button class="copy-btn" onclick="copyCode(this)">Copiar</button>
+        <pre>curl -X POST "https://dh.formosa.gob.ar/modulos/webservice/php/version_3_0/wserv_registrar_vacuna.php" \
+  --data-urlencode 'insertvacunado={
+    "id_flxcore03": "123",
+    "id_sysvacu04": "1",
+    "id_sysofic01": "456",
+    "id_sysdesa18": "10",
+    "id_sysdesa12": "789",
+    "id_sysvacu01": "2",
+    "id_sysvacu02": "3",
+    "id_sysvacu05": "4",
+    "sysdesa10_nombre": "NOMBRE",
+    "sysdesa10_apellido": "APELLIDO",
+    "sysdesa10_dni": "12345678",
+    "sysdesa10_sexo": "M",
+    "sysdesa10_nro_tramite": "123456789",
+    "sysdesa10_cadena_dni": "00012345678",
+    "sysdesa10_edad": "35",
+    "sysdesa10_fecha_nacimiento": "01/01/1990",
+    "vacunador_registrador": "0",
+    "vacunacion_en_terreno": "1",
+    "sysdesa10_apellido_tutor": "",
+    "sysdesa10_nombre_tutor": "",
+    "sysdesa10_dni_tutor": "",
+    "sysdesa10_sexo_tutor": "",
+    "fecha_aplicacion": "31/03/2026"
+  }'</pre>
+      </div>
+      <div class="tab-pane" id="reg-response">
+        <pre>{
+  "codigo_mensaje": "0",
+  "mensaje": "Vacuna registrada correctamente"
+}</pre>
+      </div>
+      <div class="tab-pane" id="reg-notas">
+        <table>
+          <tr><th>Nota</th><th>Detalle</th></tr>
+          <tr><td>JSON en form field</td><td>El body NO es JSON directo. Es un form con un campo llamado <code class="inline">insertvacunado</code> que contiene el JSON como string.</td></tr>
+          <tr><td>Tutor opcional</td><td>Si el beneficiario es mayor, los campos de tutor pueden enviarse vacios.</td></tr>
+          <tr><td>Formato de fecha</td><td>Usar <code class="inline">dd/mm/yyyy</code> (ej: <code class="inline">31/03/2026</code>).</td></tr>
+          <tr><td><code class="inline">vacunacion_en_terreno</code></td><td>La app móvil ya lo envía en el JSON (<code class="inline">1</code>/<code class="inline">0</code>). Hasta que el PHP lo persista, el valor solo queda en el cliente y en trazas de red.</td></tr>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Cantidad vacunados -->
+  <div class="card" id="card-cant">
+    <div class="card-header" onclick="toggle('card-cant')">
+      <span class="badge get">GET</span>
+      <span class="path">version_3_0/wserv_cantidad_vacunas_registradas.php</span>
+      <span class="title">Cantidad de vacunas registradas</span>
+      <span class="chevron">&#9660;</span>
+    </div>
+    <div class="card-body">
+      <div class="tabs">
+        <div class="tab active" onclick="showTab(this,'cant','params')">Parametros</div>
+        <div class="tab" onclick="showTab(this,'cant','curl')">cURL</div>
+        <div class="tab" onclick="showTab(this,'cant','response')">Respuesta</div>
+      </div>
+      <div class="tab-pane active" id="cant-params">
+        <table>
+          <tr><th>Parametro</th><th>Tipo</th><th>Req.</th><th>Descripcion</th></tr>
+          <tr><td><code class="inline">id_sysdesa12</code></td><td>String</td><td><span class="required">SI</span></td><td>ID del vacunador</td></tr>
+          <tr><td><code class="inline">vacunador_registrador</code></td><td>String</td><td><span class="required">SI</span></td><td><code class="inline">0</code> = vacunador | <code class="inline">1</code> = registrador</td></tr>
+        </table>
+      </div>
+      <div class="tab-pane" id="cant-curl">
+        <button class="copy-btn" onclick="copyCode(this)">Copiar</button>
+        <pre>curl "https://dh.formosa.gob.ar/modulos/webservice/php/version_3_0/wserv_cantidad_vacunas_registradas.php?id_sysdesa12=789&amp;vacunador_registrador=0"</pre>
+      </div>
+      <div class="tab-pane" id="cant-response">
+        <pre>{
+  "usuario": [
+    {
+      "id_sysdesa12": "789",
+      "cantidad_aplicaciones": "42",
+      "codigo_mensaje": "0",
+      "mensaje": "OK"
+    }
+  ]
+}</pre>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<footer>App Vacunacion Formosa &mdash; Documentacion interna &mdash; 2026</footer>
+
+<script>
+  function toggle(id) {
+    const card = document.getElementById(id);
+    card.classList.toggle('open');
+  }
+
+  function showTab(btn, group, pane) {
+    const card = btn.closest('.card-body');
+    card.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    card.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById(group + '-' + pane).classList.add('active');
+  }
+
+  function copyCode(btn) {
+    const pre = btn.nextElementSibling;
+    navigator.clipboard.writeText(pre.innerText).then(() => {
+      btn.textContent = 'Copiado!';
+      setTimeout(() => btn.textContent = 'Copiar', 1500);
+    });
+  }
+</script>
+</body>
+</html>

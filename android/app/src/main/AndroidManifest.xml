@@ -1,14 +1,14 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.upsti.sistema_vacunacion"
-    android:installLocation="preferExternal">
+    package="com.mindh.vacunacion">
     <uses-permission android:name="android.permission.INTERNET"/>
-    <uses-permission android:name="android.permission.CAMERA" />
-    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/>
-    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
+    <uses-permission android:name="android.permission.CAMERA"/>
    
    <application
-        android:label="sistema_vacunacion"
+        android:label="${appLabel}"
         android:icon="@mipmap/ic_launcher">
+        <!-- adjustPan: el IME no encoge la vista en cada frame (menos layout/jank en MIUI).
+             adjustResize dispara muchos "viewport metrics" por animación del teclado. Si alguna pantalla sin
+             scroll deja el campo tapado, revisar esa pantalla o volver a adjustResize. -->
         <activity
             android:exported="true"
             android:name=".MainActivity"
@@ -16,7 +16,7 @@
             android:theme="@style/LaunchTheme"
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
             android:hardwareAccelerated="true"
-            android:windowSoftInputMode="adjustResize">
+            android:windowSoftInputMode="adjustPan">
             <!-- Specifies an Android theme to apply to this Activity as soon as
                  the Android process has started. This theme is visible to the user
                  while the Flutter UI initializes. After that, this theme continues

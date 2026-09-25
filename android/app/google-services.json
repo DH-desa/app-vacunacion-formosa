@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "316126422536",
+    "project_id": "app-vacunacion-formosa",
+    "storage_bucket": "app-vacunacion-formosa.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:316126422536:android:4c48108277ad366adb53bd",
+        "android_client_info": {
+          "package_name": "com.mindh.vacunacion"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA-SzBEStcJ6fPoNSURxLz1vlOEJ-pz-ho"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:316126422536:android:2137ef0e7be4aa50db53bd",
+        "android_client_info": {
+          "package_name": "com.mindh.vacunacion.demo"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA-SzBEStcJ6fPoNSURxLz1vlOEJ-pz-ho"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -1,0 +1,14 @@
+# https://editorconfig.org — evitar archivos en Latin-1 u otras codificaciones.
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+[*.{dart,yaml,yml,md,json,html,gradle}]
+indent_style = space
+
+[*.md]
+trim_trailing_whitespace = false

@@ -1,0 +1,101 @@
+{
+  "releases": [
+    {
+      "version": "4.1.0",
+      "fecha": "2026-08",
+      "titulo": "Versión 4.1 — sesión de vacunación multi-registro y rediseño de la pantalla de vacunas",
+      "features": [
+        "Situación del beneficiario (embarazada, puérpera, personal de salud) visible y editable durante la carga, con la matriz del Calendario Nacional 2026.",
+        "Historial de dosis de la persona se actualiza automáticamente al registrar más de una vacuna en la misma visita.",
+        "El perfil de vacunación elegido se mantiene entre vacunas de la misma visita, sin tener que volver a seleccionarlo cada vez.",
+        "Aviso (no bloqueante) cuando la vacuna y dosis que se va a registrar ya figura aplicada en la visita o en el historial de la persona.",
+        "Cancelar el registro de una vacuna ahora permite elegir entre volver, salir a buscar otra persona o descartar solo la vacuna en curso, sin perder los datos ya cargados.",
+        "Rediseño de la pantalla de vacunas: el formulario queda como protagonista, el calendario y el historial pasan a hojas inferiores, y la identidad del beneficiario y la alerta de tutor faltante quedan siempre visibles.",
+        "Modales, diálogos de alerta y hojas inferiores unificados en un mismo componente visual en toda la app."
+      ],
+      "fixes": [
+        "El escáner de DNI ahora valida también la respuesta del servidor para el beneficiario escaneado (antes solo se validaba en la carga manual y en el tutor).",
+        "La condición gestacional se revalida contra el sexo real informado por el servidor, no solo contra lo tildado en el formulario.",
+        "La fecha de aplicación ya no permite elegirse antes de la fecha de nacimiento de la persona.",
+        "El campo sexo del formulario manual (beneficiario/tutor) ya no completa \"Femenino\" por defecto: hay que elegirlo.",
+        "Corrección del input de D.N.I. que perdía el borde redondeado al enfocarse.",
+        "Corrección del bottom sheet de detalle del beneficiario, que no permitía hacer scroll."
+      ],
+      "maintenance": [
+        "Reorganización interna del código a arquitectura por capas (core/data/domain/presentation).",
+        "Migración del manejo de estado interno de la app a un modelo más simple y consistente, reemplazando streams por listeners en las pantallas de vacunas y vacunador.",
+        "Limpieza de código sin uso y de escrituras redundantes en la sesión de vacunación en terreno."
+      ],
+      "items": []
+    },
+    {
+      "version": "4.0.0",
+      "fecha": "2026-04",
+      "titulo": "Versión 4.0 — actualización mayor de la app",
+      "features": [
+        "Interfaz Material 3: colores, tipografía y componentes alineados al sistema (tema claro y oscuro).",
+        "Modo de apariencia claro, oscuro o automático según el dispositivo, con la elección guardada.",
+        "Login renovado con cabecera de marca y acceso claro al escáner de DNI.",
+        "Menú lateral rediseñado: accesos organizados, versión de la app y enlace a estas notas.",
+        "Búsqueda de beneficiario y flujo del vacunador con pantallas actualizadas.",
+        "Pantalla de vacunas reorganizada para que sea más clara y fácil de mantener.",
+        "Confirmación de datos y demás pantallas alineadas al nuevo diseño.",
+        "Lectura del DNI con cámara mejorada y validaciones del flujo de vacunación.",
+        "Mejor manejo de datos del código de barras del DNI y de imágenes cuando la app las necesita en otro formato.",
+        "Diálogos, barras superiores y botones unificados con el resto de la aplicación."
+      ],
+      "fixes": [
+        "Datos que envía y recibe la app ajustados al servidor (personas, vacunas, lotes, perfiles y demás).",
+        "Comportamiento más estable al cargar listas y formularios de vacunación.",
+        "Pantalla «Sobre nosotros» muestra la misma versión que en el inicio de sesión y el menú."
+      ],
+      "maintenance": [
+        "Actualización de la compilación para Android reciente (entorno de desarrollo y tiendas).",
+        "Compatibilidad con la versión actual de Flutter utilizada por el proyecto.",
+        "Bibliotecas del proyecto revisadas y alineadas a esas versiones."
+      ],
+      "items": []
+    },
+    {
+      "version": "3.0.0",
+      "fecha": "2026-04",
+      "titulo": "Actualización 2026 — rediseño y nueva base técnica",
+      "features": [
+        "Tema claro, oscuro y «según sistema» con persistencia en SharedPreferences (tema_app_service) y selector solo con iconos en el drawer.",
+        "MaterialApp reactivo al tema: ListenableBuilder + theme / darkTheme / themeMode sin parpadeo al iniciar (main async).",
+        "Tokens de diseño: AppSuperficies (tarjetas/sombras M3) y escala AppEspaciado para márgenes coherentes en toda la app.",
+        "Tema visual ampliado en apptema_config (SisVacuTheme): paleta y tipografía alineadas a Material 3.",
+        "Pantalla de vacunas factorizada: extracción de UI a vacunas_ui_helpers.dart y reorganización masiva del flujo.",
+        "Búsqueda de beneficiario: rediseño de pantalla y experiencia (busquedabeneficiario_page).",
+        "Flujo del vacunador renovado: layout, navegación y presentación (vacunador_page).",
+        "Login con cabecera en gradiente (MarcaCabeceraGradiente) y tarjeta de acceso al escáner.",
+        "Menú lateral (drawer) rediseñado: cabecera de marca, secciones, apariencia y cierre de sesión.",
+        "Diálogo de alertas renovado al patrón Material 3 (alertadialogo_widget).",
+        "AppBar de sesión reutilizable para pantallas autenticadas (app_bar_sesion_widget).",
+        "Cabeceras y marca: marca_cabecera_gradiente_widget; headers_widgets actualizado.",
+        "Nuevo stack de escaneo basado en flutter_zxing con pin de camera_android estable para el lector de DNI.",
+        "Utilidad imagen_base64_util para manejo de imágenes en Base64 en servicios/pantallas.",
+        "encoding_utils: decodificación PDF417 del DNI (Latin-1 vs UTF-8, detección de mojibake y cadenas corruptas).",
+        "Widget escanerdni_widget reescrito en línea con el nuevo motor de lectura y validaciones.",
+        "Documentación de API en el repo: api_docs.html y endpoints.txt.",
+        "SemVer en pubspec, lectura con package_info_plus, chip de versión y notas embebidas en login y drawer."
+      ],
+      "fixes": [
+        "Modelos alineados al contrato del servidor: mensajes, notificaciones de dosis, validación de versión, usuario/beneficiario, login, vacunador, cantidad vacunados y familia completa de modelos de vacunas (config, info, lotes, perfiles, condición, dosis, esquema, validación).",
+        "Providers actualizados en cadena: beneficiario, efectores, login, insert registro, notificaciones, validar versión, vacunador, conteos, config/info/lotes/perfiles de vacunas, condición, dosis, esquema y vacunas por perfil.",
+        "Servicios: perfiles de vacunación y usuario beneficiario ajustados a los nuevos modelos.",
+        "Pantalla confirmación de datos y flujo de vacunas sincronizados con los cambios de modelo y UI.",
+        "Sobre nosotros y componentes base (botones, inputs, colores, fondos, títulos) unificados con el nuevo sistema visual."
+      ],
+      "maintenance": [
+        "Cadena de build Android modernizada: app/build.gradle, build.gradle raíz, settings.gradle, gradle.properties y Gradle Wrapper.",
+        "SDK de Dart ampliado a >=2.12 <4.0.0 para compatibilidad con Flutter 3.4x.",
+        "Dependencias actualizadas: http ^1.2, url_launcher ^6.2, shared_preferences ^2.2, google_fonts ^6, animate_do ^4.2, intl ^0.20.2, loading_indicator, splash e iconos de launcher; overrides explícitos de file y google_fonts.",
+        "Eliminación del stack antiguo de escaneo/UI no mantenido (p. ej. flutter_barcode_scanner, fl_chart, flutter_picker, flutter_svg, scrollable_positioned_list) en favor del conjunto actual.",
+        "Limpieza masiva de APIs deprecadas de Flutter 3.41 en widgets y páginas tocadas.",
+        ".editorconfig y ajustes .vscode para formato y estilo consistentes entre el equipo."
+      ],
+      "items": []
+    }
+  ]
+}

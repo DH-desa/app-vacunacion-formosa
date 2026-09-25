@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 
+import 'package:sistema_vacunacion/src/config/config.dart';
+
 class CustomInput extends StatelessWidget {
   final IconData icon;
   final String placeholder;
   final TextEditingController textController;
   final TextInputType keyboardType;
   final Function()? funcion;
+  final EdgeInsets scrollPadding;
 
   final bool isPassword;
   final bool funcionTerminar;
@@ -14,7 +17,7 @@ class CustomInput extends StatelessWidget {
   final FocusNode focusNode;
 
   const CustomInput({
-    Key? key,
+    super.key,
     required this.icon,
     required this.placeholder,
     required this.textController,
@@ -25,25 +28,21 @@ class CustomInput extends StatelessWidget {
     this.maxLength = 8,
     required this.focusNode,
     this.funcion,
-  }) : super(key: key);
+    this.scrollPadding = const EdgeInsets.only(bottom: 120),
+  });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.only(top: 5, left: 5, bottom: 5, right: 20),
-      margin: EdgeInsets.only(
-          right: MediaQuery.of(context).size.width * 0.04,
-          left: MediaQuery.of(context).size.width * 0.04),
-      decoration: BoxDecoration(
-          color: Colors.white,
-          // color: Colors.blueGrey[50],
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: <BoxShadow>[
-            BoxShadow(
-                color: Colors.black.withOpacity(0.05),
-                offset: const Offset(0, 5),
-                blurRadius: 5)
-          ]),
+      clipBehavior: Clip.antiAlias,
+      padding: const EdgeInsets.only(
+        top: AppEspaciado.xs,
+        left: AppEspaciado.xs,
+        bottom: AppEspaciado.xs,
+        right: AppEspaciado.lg,
+      ),
+      margin: const EdgeInsets.symmetric(horizontal: AppEspaciado.lg),
+      decoration: AppSuperficies.campoBusqueda(context),
       child: TextField(
         autofocus: autoFocus,
         focusNode: focusNode,
@@ -52,9 +51,12 @@ class CustomInput extends StatelessWidget {
         controller: textController,
         keyboardType: keyboardType,
         obscureText: isPassword,
-        onEditingComplete: funcionTerminar == true ? funcion : null,
+        onEditingComplete: funcionTerminar ? funcion : null,
+        scrollPadding: scrollPadding,
         decoration: InputDecoration(
-          prefixIcon: Icon(icon),
+          filled: true,
+          fillColor: Theme.of(context).colorScheme.surfaceContainer,
+          prefixIcon: Icon(icon, size: AppTamanoIcono.mediano),
           focusedBorder: InputBorder.none,
           border: InputBorder.none,
           hintText: placeholder,
