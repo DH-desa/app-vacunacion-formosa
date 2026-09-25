@@ -11,8 +11,22 @@ Requisitos: **Android físico con depuración USB** y cámara (el escáner de DN
 usa la cámara real; no funciona en emulador).
 
 ```bash
-flutter run -d <id-dispositivo> --flavor demo -t lib/demo/main_demo.dart
+make demo                      # o, con varios dispositivos: make demo DEVICE=<id>
 ```
+
+El `Makefile` de la raíz arma el comando completo:
+
+| Comando | Equivale a |
+|---|---|
+| `make demo` | `flutter run --flavor demo -t lib/demo/main_demo.dart` |
+| `make prod` | `flutter run --flavor prod -t lib/main.dart` |
+| `make apk-demo` | íconos demo + `flutter build apk --flavor demo -t lib/demo/main_demo.dart` |
+| `make apk-prod` | íconos prod + `flutter build apk --flavor prod -t lib/main.dart` |
+
+> **Atención:** `flutter run --flavor demo` **sin** `-t` instala la app con
+> nombre e ícono de DEMO, pero corre `lib/main.dart` contra el backend real
+> (`dh.formosa.gob.ar`): lo que se registre ahí impacta en la BD. El flavor
+> solo elige el APK; el backend falso lo pone el `-t`.
 
 Sin `--flavor demo`, Gradle no sabe qué variante instalar (hay dos:
 `demo` y `prod`, con `applicationId` distinto) y puede terminar
@@ -31,7 +45,8 @@ Hay dos flavors: `demo` y `prod`. Demo apunta al backend falso
 instalados en el mismo teléfono.
 
 Antes de buildear, regenerá los íconos con la config correspondiente
-(ambos comandos sobreescriben `android/app/src/main/res/mipmap-*`):
+(ambos comandos sobreescriben `android/app/src/main/res/mipmap-*`).
+`make apk-demo` y `make apk-prod` hacen los dos pasos:
 
 ```bash
 # Producción (ícono normal, "Sistema Vacunación")
@@ -46,7 +61,7 @@ flutter build apk --flavor demo -t lib/demo/main_demo.dart
 Para volver a producción:
 
 ```bash
-flutter run --flavor prod            # o flutter build apk --flavor prod
+make prod                            # o make apk-prod
 ```
 
 El flavor sigue haciendo falta aunque no uses `-t`: una vez que
@@ -76,29 +91,47 @@ catálogo de la demo (vacunas y DNIs designados), no con botones externos.
 
 ## DNI de muestra
 
-Todos ficticios. El backend falso responde según el DNI con datos coherentes
-(fecha de nacimiento alineada con la fecha de la demo: 2026-08-13) para que
-el **Calendario Nacional 2026** clasifique a cada persona en la fila etaria
-correcta y genere las vacunas pendientes correspondientes.
+Todos ficticios. El backend falso arma las pendientes igual que
+`wserv_listados_vacunas.php` (ver `docs/backend_wserv_listados_vacunas.php`):
+todas las dosis de los rangos etarios que la persona ya alcanzó según la edad
+en días que manda la app, más las de su condición, menos las aplicadas. Las
+que caen fuera de su ventana de aplicación llegan con
+`aplicacion_dentro_limite = 0` y la app las oculta. Los lactantes y la
+adolescente de 15 años tienen fecha de nacimiento relativa a hoy, así que no
+cambian de fila con el paso del tiempo.
+
+Historial fijo: BCG y Hepatitis B 1ra dosis (salvo el recién nacido y
+`11111120`). Todo lo demás queda pendiente, así cada vacuna muestra su serie
+completa y el switch **"Controlar orden de dosis"** bloquea la 2da mientras la
+1ra siga pendiente.
 
 ### Beneficiario (ingreso manual o escaneo)
 
-| DNI | Persona | Edad | Calendario 2026 (pendientes) |
+| DNI | Persona | Edad | Pendientes visibles (bloqueadas por el switch en *cursiva*) |
 |---|---|---|---|
-| `11111112` | Mateo Gómez, M | Recién nacido | BCG, Hepatitis B |
-| `11111113` | Sofía Ruiz, F | 6 meses | Neumococo 3ra, Quíntuple 3ra, Antigripal |
-| `11111114` | Diego López, M | 12 meses | Neumococo refuerzo, Antigripal, Hepatitis A, Triple Viral 1ra |
-| `11111115` | Valentina Martínez, F | 15 meses | Quíntuple refuerzo, Meningococo refuerzo, Antigripal, Triple Viral 2da, Varicela 1ra |
-| `11111116` | Bruno Pérez, M | 18 meses | Antigripal |
-| `11111117` | Emma Sánchez, F | 5 años (2021) | IPV refuerzo, Triple Viral 2da, Varicela 2da, Triple Bacteriana Celular 2do refuerzo |
-| `11111118` | Tomás Torres, M | 11 años (2015) | Meningococo, Triple Bacteriana Acelular, VPH, Fiebre Amarilla |
-| `11111119` | Camila Acosta, F | 15 años | Triple Viral, Fiebre Hemorrágica Argentina |
-| `11111120` | Juan Díaz, M | 36 años | Hepatitis B, Neumococo, Antigripal, Triple Viral, Doble Bacteriana, FHA |
-| `22222222` | Carla Romero, F, embarazada | 31 años | Antigripal, Triple Bacteriana Acelular, VSR (+ filas adulto) |
-| `33333333` | Laura Vega, F, puérpera | 33 años | Antigripal, Triple Viral (+ filas adulto) |
-| `44444444` | Roberto Castro, M, personal de salud | 38 años | Antigripal, Triple Viral, Triple Bacteriana Acelular (+ filas adulto) |
-| `11111111` | Lucía Fernández, F | 35 años | Igual que adulto genérico (compatibilidad) |
+| `11111112` | Mateo Gómez, M | 3 días | BCG, Hepatitis B 1ra |
+| `11111113` | Sofía Ruiz, F | 6 meses | Antigripal · IPV 1ra, *2da* · Meningococo 1ra, *2da* · Neumococo 1ra, *2da*, *3ra* · Quíntuple 1ra, *2da*, *3ra* (Rotavirus oculta: fuera de límite) |
+| `11111114` | Diego López, M | 12 meses | Lo de 6 meses + Neumococo *Refuerzo*, Hepatitis A, Triple Viral 1ra |
+| `11111115` | Valentina Martínez, F | 15 meses | Lo de 12 meses + Quíntuple *1er Refuerzo*, Meningococo *Refuerzo*, Triple Viral *2da*, Varicela 1ra |
+| `11111116` | Bruno Pérez, M | 18 meses | Lo de 15 meses + Fiebre Amarilla 1ra |
+| `11111117` | Emma Sánchez, F | 5 años (2021) | Fiebre Amarilla 1ra · IPV 1ra, *2da*, *Refuerzo* · Quíntuple 1ra, *2da*, *3ra*, *1er Refuerzo* · Triple Bacteriana Celular · Triple Viral 1ra, *2da* · Varicela 1ra, *2da* |
+| `11111118` | Tomás Torres, M | 11 años (2015) | Fiebre Amarilla 1ra, *Refuerzo* · Meningococo única · Triple Bacteriana Acelular · Triple Viral 1ra, *2da* · Varicela 1ra, *2da* · VPH |
+| `11111119` | Camila Acosta, F | 15 años | Fiebre Amarilla 1ra · FHA · Triple Viral 1ra, *2da* |
+| `11111120` | Juan Díaz, M, sin Hepatitis B | 36 años | Doble Bacteriana · Fiebre Amarilla 1ra · FHA · Hepatitis B 1ra, *2da*, *3ra* · Triple Viral 1ra, *2da* |
+| `11111111` | Lucía Fernández, F | 35 años | Doble Bacteriana · Fiebre Amarilla 1ra · FHA · Hepatitis B 2da, *3ra* · Triple Viral 1ra, *2da* |
+| `22222222` | Carla Romero, F, embarazada | 31 años | Adulto + Antigripal, Triple Bacteriana Acelular y VSR (condición Embarazada) |
+| `33333333` | Laura Vega, F, puérpera | 33 años | Adulto + Antigripal y Triple Viral 1ra, *2da* (condición Puérpera) |
+| `44444444` | Roberto Castro, M, personal de salud | 38 años | Adulto + Antigripal, Triple Bacteriana Acelular y Triple Viral 1ra, *2da* (condición Personal de salud) |
 | `99999999` | No encontrado | — | "No se encontró el beneficiario" |
+
+Un DNI real escaneado que no está en la tabla vuelve como "Lucía Fernández",
+pero sus pendientes salen de la edad que la app calcula con la fecha del
+PDF417, igual que en producción.
+
+La situación (embarazada/puérpera/personal de salud) se elige en la app al
+cargar la persona; embarazada y puérpera solo se ofrecen con sexo F. Las
+condiciones usan los ids del backend real: embarazada `2`, personal de salud
+`4`, puérpera `5`.
 
 **Vacunador**: cualquier DNI OK · `30000002` inválido.
 
@@ -203,8 +236,10 @@ corrido. Buscá por el DNI o el id de vacuna (`"35"`, `"36"`).
 
 18 vacunas del Calendario Nacional 2026, cada una con condiciones, esquemas,
 dosis y lotes coherentes. La vía **Pendientes** (4 pasos) en VacunasPage
-muestra las vacunas que corresponden al beneficiario según edad, sexo y
-condición, generadas dinámicamente por el backend falso.
+muestra las vacunas que corresponden al beneficiario según edad y condición,
+generadas dinámicamente por el backend falso. En la vía **Vacuna**, Antigripal,
+Triple Viral, Triple Bacteriana Acelular, VSR y COVID-19 ofrecen además las
+condiciones especiales que les corresponden.
 
 ---
 

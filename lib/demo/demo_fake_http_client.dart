@@ -12,18 +12,20 @@
 // según el DNI escaneado/ingresado para que cada validación de la app sea
 // alcanzable con un DNI conocido (ver docs/demo_guia.md).
 //
-// Las vacunas pendientes se generan dinámicamente según el Calendario
+// Las vacunas pendientes se generan como lo hace el backend real
+// (docs/backend_wserv_listados_vacunas.php) con las filas del Calendario
 // Nacional de Vacunación 2026 (docs/calendario_nacional_vacunacion_2026.md):
-// la edad, sexo y condición (embarazada/puérpera/personal de salud)
-// determinan qué vacunas corresponden, igual que haría el backend real.
+// todas las dosis de los rangos etarios alcanzados según la edad en días que
+// manda la app, más las de cada condición (embarazada/puérpera/personal de
+// salud), menos las aplicadas. Escaneo e ingreso manual se resuelven igual.
 //
 // DNI de muestra (todos ficticios):
 //   Registrador: 36355149 OK · 30000000 sin permiso · 30000001 sin efector
 //   Vacunador:   cualquier DNI OK · 30000002 inválido
-//   Beneficiario: 11111111 adulta · 11111112 recién nacido · 11111113 6 meses
-//                 11111114 12 meses · 11111115 15 meses · 11111116 18 meses
-//                 11111117 5 años (nacido 2021) · 11111118 11 años (nacido 2015)
-//                 11111119 15 años · 11111120 35 años
+//   Beneficiario: 11111111 adulta · 11111112 recién nacido (3 días)
+//                 11111113 6 meses · 11111114 12 meses · 11111115 15 meses
+//                 11111116 18 meses · 11111117 nacida 2021 · 11111118 nacido 2015
+//                 11111119 15 años · 11111120 adulto sin Hepatitis B
 //                 22222222 embarazada · 33333333 puérpera · 44444444 personal salud
 //                 99999999 no encontrado
 
@@ -59,53 +61,61 @@ http.StreamedResponse _noContent(int status) =>
 
 // ── Beneficiarios de muestra ────────────────────────────────────────────────
 //
-// Cada DNI tiene fecha de nacimiento coherente con hoy (2026-08-13) para que
-// el clasificador del calendario 2026 ubique a la persona en la fila etaria
-// correcta. El DNI 11111111 pasa a adulta para mantener compatibilidad con
-// el flujo de tutor del primer mensaje.
+// Los lactantes y la adolescente de 15 años se fechan relativo a hoy: su fila
+// del calendario depende del mes exacto y una fecha fija los corre de fila
+// con el paso del tiempo. Las cohortes 2021/2015 conservan el año porque el
+// calendario de la app las clasifica por año de nacimiento. El DNI 11111111
+// pasa a adulta para mantener compatibilidad con el flujo de tutor del
+// primer mensaje.
 
 class _DniBeneficiario {
-  final String dni;
   final String apellido;
   final String nombre;
   final String sexo;
-  final String fechaNacimiento;
-  final String edadAnios;
-  const _DniBeneficiario(this.dni, this.apellido, this.nombre, this.sexo,
-      this.fechaNacimiento, this.edadAnios);
+  final DateTime fechaNacimiento;
+  const _DniBeneficiario(
+      this.apellido, this.nombre, this.sexo, this.fechaNacimiento);
 }
 
-// Edades calculadas respecto al 2026-08-13.
-final Map<String, _DniBeneficiario> _beneficiariosDemo = {
-  '11111111': const _DniBeneficiario(
-      '11111111', 'Fernández', 'Lucía', 'F', '1991-04-12', '35'),
-  '11111112': const _DniBeneficiario(
-      '11111112', 'Gómez', 'Mateo', 'M', '2026-07-01', '0'),
-  '11111113': const _DniBeneficiario(
-      '11111113', 'Ruiz', 'Sofía', 'F', '2026-02-01', '0'),
-  '11111114': const _DniBeneficiario(
-      '11111114', 'López', 'Diego', 'M', '2025-08-01', '0'),
-  '11111115': const _DniBeneficiario(
-      '11111115', 'Martínez', 'Valentina', 'F', '2025-05-01', '1'),
-  '11111116': const _DniBeneficiario(
-      '11111116', 'Pérez', 'Bruno', 'M', '2025-02-01', '1'),
-  '11111117': const _DniBeneficiario(
-      '11111117', 'Sánchez', 'Emma', 'F', '2021-03-15', '5'),
-  '11111118': const _DniBeneficiario(
-      '11111118', 'Torres', 'Tomás', 'M', '2015-09-20', '10'),
-  '11111119': const _DniBeneficiario(
-      '11111119', 'Acosta', 'Camila', 'F', '2010-08-13', '15'),
-  '11111120': const _DniBeneficiario(
-      '11111120', 'Díaz', 'Juan', 'M', '1990-01-15', '36'),
-  '22222222': const _DniBeneficiario(
-      '22222222', 'Romero', 'Carla', 'F', '1995-06-20', '31'),
-  '33333333': const _DniBeneficiario(
-      '33333333', 'Vega', 'Laura', 'F', '1992-12-05', '33'),
-  '44444444': const _DniBeneficiario(
-      '44444444', 'Castro', 'Roberto', 'M', '1988-04-10', '38'),
-  '35678901': const _DniBeneficiario(
-      '35678901', 'Fernández', 'Lucía', 'F', '1991-04-12', '35'),
-};
+DateTime _hoy() {
+  final ahora = DateTime.now();
+  return DateTime(ahora.year, ahora.month, ahora.day);
+}
+
+String _fechaIso(DateTime f) =>
+    '${f.year}-${f.month.toString().padLeft(2, '0')}-${f.day.toString().padLeft(2, '0')}';
+
+int _edadAnios(DateTime nacimiento, DateTime hoy) {
+  var anios = hoy.year - nacimiento.year;
+  if (hoy.month < nacimiento.month ||
+      (hoy.month == nacimiento.month && hoy.day < nacimiento.day)) {
+    anios--;
+  }
+  return anios;
+}
+
+Map<String, _DniBeneficiario> _beneficiariosDemo() {
+  final hoy = _hoy();
+  final dia = hoy.day > 28 ? 28 : hoy.day;
+  DateTime haceMeses(int meses) => DateTime(hoy.year, hoy.month - meses, dia);
+  return {
+    '11111111': _DniBeneficiario('Fernández', 'Lucía', 'F', DateTime(1991, 4, 12)),
+    '11111112': _DniBeneficiario(
+        'Gómez', 'Mateo', 'M', hoy.subtract(const Duration(days: 3))),
+    '11111113': _DniBeneficiario('Ruiz', 'Sofía', 'F', haceMeses(6)),
+    '11111114': _DniBeneficiario('López', 'Diego', 'M', haceMeses(12)),
+    '11111115': _DniBeneficiario('Martínez', 'Valentina', 'F', haceMeses(15)),
+    '11111116': _DniBeneficiario('Pérez', 'Bruno', 'M', haceMeses(18)),
+    '11111117': _DniBeneficiario('Sánchez', 'Emma', 'F', DateTime(2021, 3, 15)),
+    '11111118': _DniBeneficiario('Torres', 'Tomás', 'M', DateTime(2015, 9, 20)),
+    '11111119': _DniBeneficiario('Acosta', 'Camila', 'F', haceMeses(15 * 12 + 1)),
+    '11111120': _DniBeneficiario('Díaz', 'Juan', 'M', DateTime(1990, 1, 15)),
+    '22222222': _DniBeneficiario('Romero', 'Carla', 'F', DateTime(1995, 6, 20)),
+    '33333333': _DniBeneficiario('Vega', 'Laura', 'F', DateTime(1992, 12, 5)),
+    '44444444': _DniBeneficiario('Castro', 'Roberto', 'M', DateTime(1988, 4, 10)),
+    '35678901': _DniBeneficiario('Fernández', 'Lucía', 'F', DateTime(1991, 4, 12)),
+  };
+}
 
 Map<String, dynamic> _beneficiarioSegunDni(Uri uri) {
   final dni = uri.queryParameters['sysdesa10_dni'] ?? '';
@@ -128,7 +138,7 @@ Map<String, dynamic> _beneficiarioSegunDni(Uri uri) {
     };
   }
 
-  final demo = _beneficiariosDemo[dni];
+  final demo = _beneficiariosDemo()[dni];
   if (demo != null) {
     return {
       'sysdesa10_apellido': demo.apellido,
@@ -137,8 +147,8 @@ Map<String, dynamic> _beneficiarioSegunDni(Uri uri) {
       'sysdesa10_dni': dni,
       'sysdesa10_sexo': sexo.isNotEmpty ? sexo : demo.sexo,
       'sysdesa10_nro_tramite': '',
-      'sysdesa10_fecha_nacimiento': demo.fechaNacimiento,
-      'sysdesa10_edad': demo.edadAnios,
+      'sysdesa10_fecha_nacimiento': _fechaIso(demo.fechaNacimiento),
+      'sysdesa10_edad': '${_edadAnios(demo.fechaNacimiento, _hoy())}',
       'sysdesa10_cadena_dni': uri.queryParameters['sysdesa10_cadena_dni'] ?? '',
       'foto_beneficiario': '',
       'codigo_mensaje': _ok,
@@ -166,8 +176,8 @@ Map<String, dynamic> _beneficiarioSegunDni(Uri uri) {
 // ── Catálogo de vacunas (Calendario Nacional 2026) ───────────────────────────
 //
 // 18 vacunas del calendario, cada una con ID, condiciones, esquemas, dosis y
-// lotes coherentes. Las pendientes se generan dinámicamente según edad/sexo/
-// condición de la persona (ver _pendientesSegunCalendario).
+// lotes coherentes. Las pendientes se generan dinámicamente según edad y
+// condición de la persona (ver _listadosSegunCalendario).
 
 // Vacuna: id_sysvacu04 → nombre
 const Map<String, String> _vacunas = {
@@ -201,37 +211,41 @@ const Map<String, List<String>> _vacunasPorPerfil = {
         '30', '31', '32', '33', '34', '35', '36'],
 };
 
-// Condiciones por vacuna (todas: Sin condición = 3; algunas: Personal salud = 4)
-const Map<String, List<Map<String, String>>> _condicionesPorVacuna = {
-  '12': [
-    {'id_sysvacu01': '3', 'sysvacu01_descripcion': 'Sin condición'},
-    {'id_sysvacu01': '4', 'sysvacu01_descripcion': 'Personal de salud'},
-  ],
-  '15': [{'id_sysvacu01': '3', 'sysvacu01_descripcion': 'Sin condición'}],
-  '20': [{'id_sysvacu01': '3', 'sysvacu01_descripcion': 'Sin condición'}],
-  '21': [{'id_sysvacu01': '3', 'sysvacu01_descripcion': 'Sin condición'}],
-  '22': [{'id_sysvacu01': '3', 'sysvacu01_descripcion': 'Sin condición'}],
-  '23': [{'id_sysvacu01': '3', 'sysvacu01_descripcion': 'Sin condición'}],
-  '24': [{'id_sysvacu01': '3', 'sysvacu01_descripcion': 'Sin condición'}],
-  '25': [{'id_sysvacu01': '3', 'sysvacu01_descripcion': 'Sin condición'}],
-  '26': [{'id_sysvacu01': '3', 'sysvacu01_descripcion': 'Sin condición'}],
-  '27': [{'id_sysvacu01': '3', 'sysvacu01_descripcion': 'Sin condición'}],
-  '28': [{'id_sysvacu01': '3', 'sysvacu01_descripcion': 'Sin condición'}],
-  '29': [{'id_sysvacu01': '3', 'sysvacu01_descripcion': 'Sin condición'}],
-  '30': [{'id_sysvacu01': '3', 'sysvacu01_descripcion': 'Sin condición'}],
-  '31': [{'id_sysvacu01': '3', 'sysvacu01_descripcion': 'Sin condición'}],
-  '32': [{'id_sysvacu01': '3', 'sysvacu01_descripcion': 'Sin condición'}],
-  '33': [{'id_sysvacu01': '3', 'sysvacu01_descripcion': 'Sin condición'}],
-  '34': [{'id_sysvacu01': '3', 'sysvacu01_descripcion': 'Sin condición'}],
-  '35': [{'id_sysvacu01': '3', 'sysvacu01_descripcion': 'Sin condición'}],
-  '36': [{'id_sysvacu01': '3', 'sysvacu01_descripcion': 'Sin condición'}],
+// Condiciones: Sin condición = 3 (id propio de la demo); las especiales usan
+// los ids del backend real (wserv_listados_vacunas.php): embarazada = 2,
+// personal de salud = 4, puérpera = 5.
+const String _cSin = '3', _cEmb = '2', _cSalud = '4', _cPuer = '5';
+const Map<String, String> _descCondicion = {
+  _cSin: 'Sin condición',
+  _cEmb: 'Embarazada',
+  _cSalud: 'Personal de salud',
+  _cPuer: 'Puérpera',
+};
+
+// Condiciones especiales por vacuna (filas Embarazadas/Puérperas/Personal de
+// salud del calendario, más COVID-19 personal de salud). Todas las vacunas
+// además tienen Sin condición.
+const Map<String, List<String>> _condEspecialesPorVacuna = {
+  '12': [_cSalud],
+  '15': [_cEmb, _cSalud, _cPuer],
+  '28': [_cSalud, _cPuer],
+  '31': [_cEmb, _cSalud],
+  '34': [_cEmb],
 };
 
 // ponytail: for-in en const no compila, por eso final.
+final Map<String, List<Map<String, String>>> _condicionesPorVacuna = {
+  for (final v in _vacunas.keys)
+    v: [
+      for (final c in [_cSin, ...?_condEspecialesPorVacuna[v]])
+        {'id_sysvacu01': c, 'sysvacu01_descripcion': _descCondicion[c]!},
+    ],
+};
+
 final Map<String, List<Map<String, String>>> _esquemasPorVacunaCond = {
   for (final v in _vacunas.keys)
-    '$v|3': [{'id_sysvacu02': '7', 'sysvacu02_descripcion': 'Esquema habitual'}],
-  '12|4': [{'id_sysvacu02': '7', 'sysvacu02_descripcion': 'Esquema habitual'}],
+    for (final c in [_cSin, ...?_condEspecialesPorVacuna[v]])
+      '$v|$c': [{'id_sysvacu02': '7', 'sysvacu02_descripcion': 'Esquema habitual'}],
 };
 
 // Dosis por (vacuna|cond|esquema): mapea indicaciones del calendario a dosis.
@@ -257,6 +271,7 @@ const Map<String, List<Map<String, String>>> _dosisPorVacunaCondEsq = {
     {'id_sysvacu05': '23', 'sysvacu05_nombre': '2da Dosis'},
     {'id_sysvacu05': '24', 'sysvacu05_nombre': '3ra Dosis'},
     {'id_sysvacu05': '25', 'sysvacu05_nombre': 'Refuerzo'},
+    {'id_sysvacu05': '51', 'sysvacu05_nombre': 'Única Dosis'},
   ],
   '23|3|7': [
     {'id_sysvacu05': '26', 'sysvacu05_nombre': '1ra Dosis'},
@@ -299,6 +314,20 @@ const Map<String, List<Map<String, String>>> _dosisPorVacunaCondEsq = {
     {'id_sysvacu05': '49', 'sysvacu05_nombre': 'Refuerzo'},
   ],
   '36|3|7': [{'id_sysvacu05': '50', 'sysvacu05_nombre': 'Única Dosis'}],
+  '15|2|7': [{'id_sysvacu05': '20', 'sysvacu05_nombre': 'Dosis Anual'}],
+  '15|4|7': [{'id_sysvacu05': '20', 'sysvacu05_nombre': 'Dosis Anual'}],
+  '15|5|7': [{'id_sysvacu05': '20', 'sysvacu05_nombre': 'Dosis Anual'}],
+  '28|4|7': [
+    {'id_sysvacu05': '39', 'sysvacu05_nombre': '1ra Dosis'},
+    {'id_sysvacu05': '40', 'sysvacu05_nombre': '2da Dosis'},
+  ],
+  '28|5|7': [
+    {'id_sysvacu05': '39', 'sysvacu05_nombre': '1ra Dosis'},
+    {'id_sysvacu05': '40', 'sysvacu05_nombre': '2da Dosis'},
+  ],
+  '31|2|7': [{'id_sysvacu05': '44', 'sysvacu05_nombre': 'Refuerzo'}],
+  '31|4|7': [{'id_sysvacu05': '44', 'sysvacu05_nombre': 'Refuerzo'}],
+  '34|2|7': [{'id_sysvacu05': '47', 'sysvacu05_nombre': 'Única Dosis'}],
 };
 
 // Lotes: uno genérico por vacuna.
@@ -313,79 +342,147 @@ Map<String, List<Map<String, String>>> get _lotesPorVacuna => {
     }],
 };
 
-// ── Clasificador Calendario 2026 (función pura) ────────────────────────────
+// ── Vacunas esperadas (réplica de wserv_listados_vacunas.php) ──────────────
 //
-// Replica la lógica de clasificarFilasCalendario (calendario_2026.dart) sin
-// importar el package de la app: el fake vive en lib/demo/ y no debe tener
-// dependencias internas. El fake es autónomo.
+// El backend real arma las esperadas con TODAS las filas de los rangos
+// etarios cuyo mínimo ya alcanzó la persona (acumulativo: un adulto también
+// recibe las filas de lactante) y marca aplicacion_dentro_limite = 1 solo si
+// la edad cae dentro de la ventana de la dosis. La app oculta las que traen
+// 0, así que cada persona ve todas las dosis de su edad y las de etapas
+// anteriores que todavía están en ventana. Edades en días, como las manda
+// la app. Las ventanas que el calendario no fija son valores de la demo.
 
-/// Genera el historial (vacunas_aplicadas) y las pendientes
-/// (vacunas_pendientes) de forma coherente: una dosis dada está en el
-/// historial (ya se aplicó) O en pendientes (falta aplicar), NUNCA en ambas.
+class _FilaEsperada {
+  final String idVac;
+  final String idDosis;
+  final String nombreDosis;
+  final int edadMin; // días: desde cuándo la fila entra en el rango etario
+  final int limiteMin; // días: ventana de aplicación de la dosis
+  final int limiteMax;
+  const _FilaEsperada(this.idVac, this.idDosis, this.nombreDosis, this.edadMin,
+      this.limiteMin, this.limiteMax);
+}
+
+const int _anio = 365;
+const int _sinTope = 120 * _anio;
+
+// Ordenadas por edadMin, como el ORDER BY del backend: ante la misma
+// vacuna+dosis gana la última (la del rango etario mayor).
+const List<_FilaEsperada> _filasPorRangoEtario = [
+  // Recién nacido
+  _FilaEsperada('21', '21', 'Única Dosis', 0, 0, 6 * _anio),
+  _FilaEsperada('20', '9', '1ra Dosis', 0, 0, 7),
+  // 2 meses (Rotavirus: nota D, antes de las 14 semanas y 6 días)
+  _FilaEsperada('22', '22', '1ra Dosis', 60, 60, 5 * _anio),
+  _FilaEsperada('23', '26', '1ra Dosis', 60, 60, 7 * _anio),
+  _FilaEsperada('24', '30', '1ra Dosis', 60, 60, 7 * _anio),
+  _FilaEsperada('25', '33', '1ra Dosis', 60, 60, 104),
+  // 3 meses
+  _FilaEsperada('26', '35', '1ra Dosis', 90, 90, 2 * _anio),
+  // 4 meses (Rotavirus: nota E, antes de las 24 semanas)
+  _FilaEsperada('22', '23', '2da Dosis', 120, 120, 5 * _anio),
+  _FilaEsperada('23', '27', '2da Dosis', 120, 120, 7 * _anio),
+  _FilaEsperada('24', '31', '2da Dosis', 120, 120, 7 * _anio),
+  _FilaEsperada('25', '34', '2da Dosis', 120, 120, 168),
+  // 5 meses
+  _FilaEsperada('26', '36', '2da Dosis', 150, 150, 2 * _anio),
+  // 6 meses (Antigripal infantil: nota F, de 6 a 24 meses)
+  _FilaEsperada('22', '24', '3ra Dosis', 180, 180, 5 * _anio),
+  _FilaEsperada('23', '28', '3ra Dosis', 180, 180, 7 * _anio),
+  _FilaEsperada('15', '20', 'Dosis Anual', 180, 180, 2 * _anio),
+  // 12 meses
+  _FilaEsperada('22', '25', 'Refuerzo', 365, 365, 5 * _anio),
+  _FilaEsperada('27', '38', 'Única Dosis', 365, 365, 5 * _anio),
+  _FilaEsperada('28', '39', '1ra Dosis', 365, 365, _sinTope),
+  // 15 meses
+  _FilaEsperada('23', '29', '1er Refuerzo', 450, 450, 7 * _anio),
+  _FilaEsperada('26', '37', 'Refuerzo', 450, 450, 2 * _anio),
+  _FilaEsperada('28', '40', '2da Dosis', 450, 450, _sinTope),
+  _FilaEsperada('29', '41', '1ra Dosis', 450, 450, 13 * _anio),
+  // 18 meses (Fiebre Amarilla: nota *, de 2 a 59 años en zona de riesgo)
+  _FilaEsperada('35', '48', '1ra Dosis', 540, 540, 59 * _anio),
+  // Nacidos en 2021: el backend solo conoce la edad, se toma desde los 4 años
+  _FilaEsperada('24', '32', 'Refuerzo', 4 * _anio, 4 * _anio, 7 * _anio),
+  _FilaEsperada('28', '40', '2da Dosis', 4 * _anio, 4 * _anio, _sinTope),
+  _FilaEsperada('29', '42', '2da Dosis', 4 * _anio, 4 * _anio, 13 * _anio),
+  _FilaEsperada('30', '43', '2do Refuerzo', 4 * _anio, 4 * _anio, 7 * _anio),
+  // Nacidos en 2015: ídem, desde los 10 años
+  _FilaEsperada('26', '21', 'Única Dosis', 10 * _anio, 10 * _anio, 13 * _anio),
+  _FilaEsperada('31', '44', 'Refuerzo', 10 * _anio, 10 * _anio, 13 * _anio),
+  _FilaEsperada('32', '45', 'Única Dosis', 10 * _anio, 10 * _anio, 13 * _anio),
+  _FilaEsperada('35', '49', 'Refuerzo', 10 * _anio, 10 * _anio, 13 * _anio),
+  // A partir de los 15 años (Triple Viral: nota K, iniciar o completar)
+  _FilaEsperada('28', '39', '1ra Dosis', 15 * _anio, 15 * _anio, _sinTope),
+  _FilaEsperada('28', '40', '2da Dosis', 15 * _anio, 15 * _anio, _sinTope),
+  _FilaEsperada('36', '50', 'Única Dosis', 15 * _anio, 15 * _anio, 64 * _anio),
+  // Adultos (Hepatitis B: nota C; Neumococo y Antigripal: nota G, 65 años o más)
+  _FilaEsperada('20', '9', '1ra Dosis', 16 * _anio, 16 * _anio, _sinTope),
+  _FilaEsperada('20', '10', '2da Dosis', 16 * _anio, 16 * _anio, _sinTope),
+  _FilaEsperada('20', '11', '3ra Dosis', 16 * _anio, 16 * _anio, _sinTope),
+  _FilaEsperada('22', '51', 'Única Dosis', 16 * _anio, 65 * _anio, _sinTope),
+  _FilaEsperada('15', '20', 'Dosis Anual', 16 * _anio, 65 * _anio, _sinTope),
+  _FilaEsperada('28', '39', '1ra Dosis', 16 * _anio, 16 * _anio, _sinTope),
+  _FilaEsperada('28', '40', '2da Dosis', 16 * _anio, 16 * _anio, _sinTope),
+  _FilaEsperada('33', '46', 'Refuerzo', 16 * _anio, 16 * _anio, _sinTope),
+  _FilaEsperada('36', '50', 'Única Dosis', 16 * _anio, 16 * _anio, 64 * _anio),
+];
+
+// Filas por condición: el backend no les aplica rango etario ni límite
+// (aplicacion_dentro_limite = null). Orden del backend: 2, 4, 5.
+const Map<String, List<List<String>>> _filasPorCondicion = {
+  _cEmb: [
+    ['15', '20', 'Dosis Anual'],
+    ['31', '44', 'Refuerzo'],
+    ['34', '47', 'Única Dosis'],
+  ],
+  _cSalud: [
+    ['15', '20', 'Dosis Anual'],
+    ['28', '39', '1ra Dosis'],
+    ['28', '40', '2da Dosis'],
+    ['31', '44', 'Refuerzo'],
+  ],
+  _cPuer: [
+    ['15', '20', 'Dosis Anual'],
+    ['28', '39', '1ra Dosis'],
+    ['28', '40', '2da Dosis'],
+  ],
+};
+
+/// Historial (vacunas_aplicadas) y pendientes (vacunas_pendientes): una
+/// dosis está en uno u otro, NUNCA en ambos.
 ///
-/// Regla: una dosis del hito X está APLICADA si la persona ya superó ese
-/// hito (mesesCumplidos > X), y PENDIENTE si está justo en ese hito
-/// (mesesCumplidos == X). Antigripal "Dosis Anual" es excepción: siempre
-/// pendiente (es la del año en curso, renovvable).
+/// Historial fijo de la demo: BCG y Hepatitis B neonatal pasada la primera
+/// semana (11111120 sin Hepatitis B, para mostrar el esquema de adulto
+/// completo). Todo lo demás que corresponde queda pendiente, así cada vacuna
+/// muestra su serie de dosis y el switch "Controlar orden de dosis" tiene
+/// qué bloquear.
 MapEntry<List<Map<String, dynamic>>, List<Map<String, dynamic>>>
     _listadosSegunCalendario(Uri uri) {
   final dni = uri.queryParameters['sysdesa10_dni'] ?? '';
-  final edadDiasStr = uri.queryParameters['sysdesa10_edad'] ?? '';
   final embarazada = uri.queryParameters['embarazada'] == 'true';
   final puerpera = uri.queryParameters['puerpera'] == 'true';
   final personalSalud = uri.queryParameters['personal_salud'] == 'true';
+  final hoy = _hoy();
 
-  final demo = _beneficiariosDemo[dni];
-  DateTime? fechaNac;
-  if (demo != null) fechaNac = DateTime.tryParse(demo.fechaNacimiento);
-  final hoy = DateTime(2026, 8, 13);
-
-  int mesesCumplidos;
-  int aniosCumplidos;
-  if (fechaNac != null) {
-    mesesCumplidos = (hoy.year - fechaNac.year) * 12 +
-        (hoy.month - fechaNac.month);
-    if (hoy.day < fechaNac.day) mesesCumplidos--;
-    if (mesesCumplidos < 0) mesesCumplidos = 0;
-    aniosCumplidos = hoy.year - fechaNac.year;
-    if (hoy.month < fechaNac.month ||
-        (hoy.month == fechaNac.month && hoy.day < fechaNac.day)) {
-      aniosCumplidos--;
-    }
-  } else {
-    mesesCumplidos = (int.tryParse(edadDiasStr) ?? 0) ~/ 30;
-    aniosCumplidos = (int.tryParse(edadDiasStr) ?? 0) ~/ 365;
+  // Como el backend: la edad es la que manda la app. Si no llega, se toma la
+  // del DNI de muestra; si tampoco hay, solo aplican las filas de condición.
+  var edadDias = int.tryParse(uri.queryParameters['sysdesa10_edad'] ?? '');
+  final demo = _beneficiariosDemo()[dni];
+  if (edadDias == null && demo != null) {
+    edadDias = hoy.difference(demo.fechaNacimiento).inDays;
   }
 
   final aplicadas = <Map<String, dynamic>>[];
-  final pendientes = <Map<String, dynamic>>[];
-
-  const cSin = '3', cSalud = '4', cEmb = '5', cPuer = '6';
-  const dSin = 'Sin condición', dSalud = 'Personal de salud';
-  const dEmb = 'Embarazada', dPuer = 'Puérpera';
-
-  String fechaAplicacion(int mesHito) {
-    if (fechaNac == null) return '2025-01-01';
-    final f = DateTime(fechaNac.year, fechaNac.month + mesHito,
-        fechaNac.day > 28 ? 28 : fechaNac.day);
-    return '${f.year}-${f.month.toString().padLeft(2, '0')}-${f.day.toString().padLeft(2, '0')}';
-  }
-
-  String diasDesde(int mesHito) {
-    if (fechaNac == null) return '500';
-    final f = DateTime(fechaNac.year, fechaNac.month + mesHito,
-        fechaNac.day > 28 ? 28 : fechaNac.day);
-    return hoy.difference(f).inDays.toString();
-  }
-
-  void apl(String idVac, String nombreVac, String idDosis, String nombreDosis,
-      int mesHito) {
+  final clavesAplicadas = <String>{};
+  void apl(String idVac, String idDosis, String nombreDosis) {
+    clavesAplicadas.add('${idVac}_$idDosis');
     aplicadas.add({
-      'sysvacu04_nombre': nombreVac,
+      'sysvacu04_nombre': _vacunas[idVac],
       'sysvacu05_nombre': nombreDosis,
-      'sysdesa10_fecha_aplicacion': fechaAplicacion(mesHito),
+      'sysdesa10_fecha_aplicacion':
+          _fechaIso(hoy.subtract(Duration(days: edadDias!))),
       'fecha_proxima_dosis': '',
-      'dias_transcurridos': diasDesde(mesHito),
+      'dias_transcurridos': '$edadDias',
       'sysdesa18_lote': 'LOTE-$idVac',
       'sysvacu03_tiempo_interdosis': '',
       'codigo_mensaje': _ok,
@@ -393,184 +490,51 @@ MapEntry<List<Map<String, dynamic>>, List<Map<String, dynamic>>>
     });
   }
 
-  void pend(String idVac, String nombreVac, String idDosis, String nombreDosis,
-      {String idCond = cSin, String descCond = dSin, int dentroLimite = 1}) {
-    pendientes.add({
-      'rela_sysvacu01': idCond,
-      'sysvacu01_descripcion': descCond,
-      'rela_sysvacu02': '7',
-      'sysvacu02_descripcion': 'Esquema habitual',
-      'rela_sysvacu04': idVac,
-      'sysvacu04_nombre': nombreVac,
-      'rela_sysvacu05': idDosis,
-      'sysvacu05_nombre': nombreDosis,
-      'aplicacion_dentro_limite': dentroLimite,
-    });
+  if (edadDias != null && edadDias > 7) {
+    apl('21', '21', 'Única Dosis');
+    if (dni != '11111120') apl('20', '9', '1ra Dosis');
   }
 
-  // 11111120: adulto que NO recibió Hepatitis B al nacer → las 3 dosis
-  // del esquema de adulto están pendientes (permite probar el switch
-  // "Controlar orden de dosis": 2da bloqueada mientras 1ra esté pendiente).
-  final sinHepatitisB = dni == '11111120';
+  Map<String, dynamic> pend(String idVac, String idDosis, String nombreDosis,
+          String idCond, int? dentroLimite) =>
+      {
+        'rela_sysvacu01': idCond,
+        'sysvacu01_descripcion': _descCondicion[idCond],
+        'rela_sysvacu02': '7',
+        'sysvacu02_descripcion': 'Esquema habitual',
+        'rela_sysvacu04': idVac,
+        'sysvacu04_nombre': _vacunas[idVac],
+        'rela_sysvacu05': idDosis,
+        'sysvacu05_nombre': nombreDosis,
+        'aplicacion_dentro_limite': dentroLimite,
+      };
 
-  // ── Hitos del calendario infantil (0-24 meses) ──
-  if (mesesCumplidos > 0) {
-    apl('21', 'BCG', '21', 'Única Dosis', 0);
-    if (!sinHepatitisB) apl('20', 'Hepatitis B', '9', '1ra Dosis', 0);
-  } else if (mesesCumplidos == 0) {
-    pend('21', 'BCG', '21', 'Única Dosis');
-    if (!sinHepatitisB) pend('20', 'Hepatitis B', '9', '1ra Dosis');
-  }
-
-  if (mesesCumplidos > 2) {
-    apl('22', 'Neumococo Conjugada', '22', '1ra Dosis', 2);
-    apl('23', 'Quíntuple o Pentavalente', '26', '1ra Dosis', 2);
-    apl('24', 'IPV', '30', '1ra Dosis', 2);
-    apl('25', 'Rotavirus', '33', '1ra Dosis', 2);
-  } else if (mesesCumplidos == 2) {
-    pend('22', 'Neumococo Conjugada', '22', '1ra Dosis');
-    pend('23', 'Quíntuple o Pentavalente', '26', '1ra Dosis');
-    pend('24', 'IPV', '30', '1ra Dosis');
-    pend('25', 'Rotavirus', '33', '1ra Dosis');
-  }
-
-  if (mesesCumplidos > 3)
-    apl('26', 'Meningococo ACYW', '35', '1ra Dosis', 3);
-  else if (mesesCumplidos == 3)
-    pend('26', 'Meningococo ACYW', '35', '1ra Dosis');
-
-  if (mesesCumplidos > 4) {
-    apl('22', 'Neumococo Conjugada', '23', '2da Dosis', 4);
-    apl('23', 'Quíntuple o Pentavalente', '27', '2da Dosis', 4);
-    apl('24', 'IPV', '31', '2da Dosis', 4);
-    apl('25', 'Rotavirus', '34', '2da Dosis', 4);
-  } else if (mesesCumplidos == 4) {
-    pend('22', 'Neumococo Conjugada', '23', '2da Dosis');
-    pend('23', 'Quíntuple o Pentavalente', '27', '2da Dosis');
-    pend('24', 'IPV', '31', '2da Dosis');
-    pend('25', 'Rotavirus', '34', '2da Dosis');
-  }
-
-  if (mesesCumplidos > 5)
-    apl('26', 'Meningococo ACYW', '36', '2da Dosis', 5);
-  else if (mesesCumplidos == 5)
-    pend('26', 'Meningococo ACYW', '36', '2da Dosis');
-
-  if (mesesCumplidos > 6) {
-    apl('22', 'Neumococo Conjugada', '24', '3ra Dosis', 6);
-    apl('23', 'Quíntuple o Pentavalente', '28', '3ra Dosis', 6);
-  } else if (mesesCumplidos == 6) {
-    pend('22', 'Neumococo Conjugada', '24', '3ra Dosis');
-    pend('23', 'Quíntuple o Pentavalente', '28', '3ra Dosis');
-  }
-  if (mesesCumplidos >= 6)
-    pend('15', 'Antigripal', '20', 'Dosis Anual');
-
-  if (mesesCumplidos > 12) {
-    apl('22', 'Neumococo Conjugada', '25', 'Refuerzo', 12);
-    apl('27', 'Hepatitis A', '38', 'Única Dosis', 12);
-    apl('28', 'Triple Viral', '39', '1ra Dosis', 12);
-  } else if (mesesCumplidos == 12) {
-    pend('22', 'Neumococo Conjugada', '25', 'Refuerzo');
-    pend('27', 'Hepatitis A', '38', 'Única Dosis');
-    pend('28', 'Triple Viral', '39', '1ra Dosis');
-  }
-
-  if (mesesCumplidos > 15) {
-    apl('23', 'Quíntuple o Pentavalente', '29', '1er Refuerzo', 15);
-    apl('26', 'Meningococo ACYW', '37', 'Refuerzo', 15);
-    apl('28', 'Triple Viral', '40', '2da Dosis', 15);
-    apl('29', 'Varicela', '41', '1ra Dosis', 15);
-  } else if (mesesCumplidos == 15) {
-    pend('23', 'Quíntuple o Pentavalente', '29', '1er Refuerzo');
-    pend('26', 'Meningococo ACYW', '37', 'Refuerzo');
-    pend('28', 'Triple Viral', '40', '2da Dosis');
-    pend('29', 'Varicela', '41', '1ra Dosis');
-  }
-
-  // ── Cohortes por año de nacimiento ──
-  if (fechaNac != null) {
-    final cohorte2021 = fechaNac.year >= 2021 && fechaNac.year <= 2024;
-    if (cohorte2021 && aniosCumplidos >= 5) {
-      if (aniosCumplidos > 5) {
-        apl('24', 'IPV', '32', 'Refuerzo', 60);
-        apl('28', 'Triple Viral', '40', '2da Dosis', 60);
-        apl('29', 'Varicela', '42', '2da Dosis', 60);
-        apl('30', 'Triple Bacteriana Celular', '43', '2do Refuerzo', 60);
-      } else {
-        pend('24', 'IPV', '32', 'Refuerzo');
-        pend('28', 'Triple Viral', '40', '2da Dosis');
-        pend('29', 'Varicela', '42', '2da Dosis');
-        pend('30', 'Triple Bacteriana Celular', '43', '2do Refuerzo');
-      }
+  // Clave vacuna_dosis: la última fila con esa clave pisa a las anteriores,
+  // igual que el deduplicado del backend.
+  final esperadas = <String, Map<String, dynamic>>{};
+  if (edadDias != null) {
+    for (final f in _filasPorRangoEtario) {
+      if (f.edadMin > edadDias) continue;
+      final dentro = edadDias >= f.limiteMin && edadDias <= f.limiteMax;
+      esperadas['${f.idVac}_${f.idDosis}'] =
+          pend(f.idVac, f.idDosis, f.nombreDosis, _cSin, dentro ? 1 : 0);
     }
-    if (fechaNac.year == 2015 && aniosCumplidos >= 11) {
-      if (aniosCumplidos > 11) {
-        apl('26', 'Meningococo ACYW', '21', 'Única Dosis', 132);
-        apl('31', 'Triple Bacteriana Acelular', '44', 'Refuerzo', 132);
-        apl('32', 'Virus Papiloma Humano', '45', 'Única Dosis', 132);
-        apl('35', 'Fiebre Amarilla', '49', 'Refuerzo', 132);
-      } else {
-        pend('26', 'Meningococo ACYW', '21', 'Única Dosis');
-        pend('31', 'Triple Bacteriana Acelular', '44', 'Refuerzo');
-        pend('32', 'Virus Papiloma Humano', '45', 'Única Dosis');
-        pend('35', 'Fiebre Amarilla', '49', 'Refuerzo');
-      }
+  }
+  for (final cond in [
+    if (embarazada) _cEmb,
+    if (personalSalud) _cSalud,
+    if (puerpera) _cPuer,
+  ]) {
+    for (final f in _filasPorCondicion[cond]!) {
+      esperadas['${f[0]}_${f[1]}'] = pend(f[0], f[1], f[2], cond, null);
     }
   }
 
-  if (aniosCumplidos == 15) {
-    pend('28', 'Triple Viral', '39', '1ra Dosis');
-    pend('36', 'Fiebre Hemorrágica Argentina', '50', 'Única Dosis');
-  }
-
-  if (aniosCumplidos >= 16) {
-    pend('15', 'Antigripal', '20', 'Dosis Anual');
-    pend('28', 'Triple Viral', '39', '1ra Dosis');
-    pend('28', 'Triple Viral', '40', '2da Dosis');
-    pend('33', 'Doble Bacteriana', '46', 'Refuerzo');
-    pend('36', 'Fiebre Hemorrágica Argentina', '50', 'Única Dosis');
-    if (sinHepatitisB) {
-      pend('20', 'Hepatitis B', '9', '1ra Dosis');
-      pend('20', 'Hepatitis B', '10', '2da Dosis');
-      pend('20', 'Hepatitis B', '11', '3ra Dosis');
-    }
-  }
-
-  // ── Filas de situación (independientes de la edad) ──
-  if (embarazada) {
-    pend('15', 'Antigripal', '20', 'Dosis Anual', idCond: cEmb, descCond: dEmb);
-    pend('31', 'Triple Bacteriana Acelular', '44', 'Refuerzo',
-        idCond: cEmb, descCond: dEmb);
-    pend('34', 'Virus Sincicial Respiratorio', '47', 'Única Dosis',
-        idCond: cEmb, descCond: dEmb);
-  }
-  if (puerpera) {
-    pend('15', 'Antigripal', '20', 'Dosis Anual', idCond: cPuer, descCond: dPuer);
-    pend('28', 'Triple Viral', '39', '1ra Dosis', idCond: cPuer, descCond: dPuer);
-  }
-  if (personalSalud) {
-    pend('15', 'Antigripal', '20', 'Dosis Anual', idCond: cSalud, descCond: dSalud);
-    pend('28', 'Triple Viral', '39', '1ra Dosis', idCond: cSalud, descCond: dSalud);
-    pend('31', 'Triple Bacteriana Acelular', '44', 'Refuerzo',
-        idCond: cSalud, descCond: dSalud);
-  }
-
-  // Deduplicar pendientes por (vacuna+dosis).
-  final unicas = <String, Map<String, dynamic>>{};
-  for (final p in pendientes) {
-    final clave = '${p['rela_sysvacu04']}|${p['rela_sysvacu05']}';
-    final existente = unicas[clave];
-    if (existente == null) {
-      unicas[clave] = p;
-      continue;
-    }
-    final condExistente = existente['rela_sysvacu01']?.toString() ?? cSin;
-    final condNueva = p['rela_sysvacu01']?.toString() ?? cSin;
-    if (condExistente == cSin && condNueva != cSin) unicas[clave] = p;
-  }
-
-  return MapEntry(aplicadas, unicas.values.toList());
+  final pendientes = [
+    for (final e in esperadas.entries)
+      if (!clavesAplicadas.contains(e.key)) e.value,
+  ];
+  return MapEntry(aplicadas, pendientes);
 }
 
 // ── Cliente HTTP falso ─────────────────────────────────────────────────────

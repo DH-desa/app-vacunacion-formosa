@@ -1,6 +1,9 @@
 import 'package:sistema_vacunacion/src/utils/edad_pdf417_dni_arg.dart';
 
-/// Resultado del parseo del PDF417 del DNI argentino.
+/// Formato del código leído. Los dos conviven, no hay migración.
+enum FormatoCodigoDni { pdf417, qr }
+
+/// Resultado del parseo del código del DNI argentino.
 class DatosDniPdf417 {
   const DatosDniPdf417({
     required this.apellido,
@@ -8,16 +11,23 @@ class DatosDniPdf417 {
     required this.dni,
     required this.sexo,
     required this.tramite,
+    required this.formato,
     this.fechaNacimientoPdf417,
   });
 
   final String apellido;
   final String nombre;
   final String dni;
-  final String sexo;
+
+  /// `null` en el QR, que no trae el campo. No es fallo de parseo: Registrador
+  /// y Vacunador consultan solo por DNI.
+  final String? sexo;
   final String tramite;
 
-  /// Fecha de nacimiento tal como viene en el PDF417 (DD/MM/AAAA o ISO).
+  /// Formato del que se extrajeron estos datos.
+  final FormatoCodigoDni formato;
+
+  /// Fecha de nacimiento tal como viene en el código (DD/MM/AAAA, DD/MM/AA o ISO).
   final String? fechaNacimientoPdf417;
 }
 
@@ -26,12 +36,39 @@ final kRegexDniPdf417 = RegExp(r'^\d{7,8}$');
 final kRegexSexoPdf417 = RegExp(r'^[MFX]$', caseSensitive: false);
 final kRegexSoloNumsPdf417 = RegExp(r'^\d+$');
 
+/// JWT: tres segmentos base64url. Marca del QR 2026 — contar campos no sirve,
+/// colisiona con el PDF417 de 8.
+final kRegexJwtQrDni = RegExp(r'^eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$');
+
 // Bytes de control o U+FFFD: señal de lectura PDF417 corrupta.
 final kRegexBytesCorruptosPdf417 = RegExp('[\x00-\x1F�]');
 
-/// DNI viejo (17 campos) primero; luego layout “nuevo” por posiciones (cualquier N≥5);
-/// si no aplica, heurística por dígitos y texto.
+/// True si [p] son los campos de un QR 2026, reconocido por el JWT final.
+bool esLecturaQrDniArgentino(List<String> p) =>
+    p.length == 8 && kRegexJwtQrDni.hasMatch(p[7].trim());
+
+/// Layout QR: `tramite@apellido@nombre@dni@ejemplar@fNac@fEmision@jwt`.
+/// Sin sexo y sin dejar el hueco, así que desde [3] va corrido contra el PDF417.
+DatosDniPdf417? _parsearQrDniArgentino(List<String> p) {
+  final dni = p[3].replaceAll(RegExp(r'\s'), '');
+  if (!kRegexDniPdf417.hasMatch(dni)) return null;
+  return DatosDniPdf417(
+    apellido: p[1],
+    nombre: p[2],
+    dni: dni,
+    sexo: null, // el QR no lo trae; lo aporta el operador
+    tramite: p[0],
+    formato: FormatoCodigoDni.qr,
+    fechaNacimientoPdf417: fechaNacimientoDesdePartesPdf417(p),
+  );
+}
+
+/// QR 2026 primero (se identifica por el JWT); después DNI viejo (16/17 campos),
+/// luego layout “nuevo” por posiciones (cualquier N≥5), y si nada aplica,
+/// heurística por dígitos y texto.
 DatosDniPdf417? parsearPdf417DniArgentino(List<String> p) {
+  if (esLecturaQrDniArgentino(p)) return _parsearQrDniArgentino(p);
+
   final n = p.length;
   final fn = fechaNacimientoDesdePartesPdf417(p);
 
@@ -46,6 +83,7 @@ DatosDniPdf417? parsearPdf417DniArgentino(List<String> p) {
         dni: dni,
         sexo: sx,
         tramite: p[10],
+        formato: FormatoCodigoDni.pdf417,
         fechaNacimientoPdf417: fn,
       );
     }
@@ -57,6 +95,7 @@ DatosDniPdf417? parsearPdf417DniArgentino(List<String> p) {
       dni: h.dni,
       sexo: h.sexo,
       tramite: h.tramite,
+      formato: FormatoCodigoDni.pdf417,
       fechaNacimientoPdf417: fn ?? h.fechaNacimientoPdf417,
     );
   }
@@ -71,6 +110,7 @@ DatosDniPdf417? parsearPdf417DniArgentino(List<String> p) {
         dni: dni,
         sexo: sx,
         tramite: p[0],
+        formato: FormatoCodigoDni.pdf417,
         fechaNacimientoPdf417: fn,
       );
     }
@@ -84,13 +124,14 @@ DatosDniPdf417? parsearPdf417DniArgentino(List<String> p) {
     dni: h.dni,
     sexo: h.sexo,
     tramite: h.tramite,
+    formato: FormatoCodigoDni.pdf417,
     fechaNacimientoPdf417: fn ?? h.fechaNacimientoPdf417,
   );
 }
 
 /// M / F / X (género no binario, habilitado por Renaper desde 2021).
-/// Devuelve `null` si [raw] no es un valor de sexo reconocible — el caller
-/// debe tratarlo como fallo de parseo, nunca asumir un sexo por default.
+/// Devuelve `null` si [raw] no es un valor de sexo reconocible. El caller nunca
+/// debe asumir un sexo por default: o lo pide, o no consulta.
 String? normalizarSexoPdf417(String raw) {
   final u = raw.trim().toUpperCase();
   if (u == 'M' || u == 'MASCULINO') return 'M';
@@ -128,9 +169,8 @@ DatosDniPdf417? parseoHeuristicoPdf417(List<String> p) {
     sexo = normalizarSexoPdf417(s.trim());
     if (sexo != null) break;
   }
-  // Ningún campo tiene un valor de sexo reconocible: parseo no confiable,
-  // no asumir "F" por default.
-  if (sexo == null) return null;
+  // Sin sexo reconocible el parseo sigue valiendo: el DNI ya se encontró.
+  // Nunca se asume un valor por default.
 
   final textos = <String>[];
   for (var i = 0; i < p.length; i++) {
@@ -154,12 +194,15 @@ DatosDniPdf417? parseoHeuristicoPdf417(List<String> p) {
     dni: dni,
     sexo: sexo,
     tramite: tramite,
+    // Solo se llega acá desde la rama PDF417: el QR se despacha antes.
+    formato: FormatoCodigoDni.pdf417,
     fechaNacimientoPdf417:
         null, // el caller ya calculó fn y hace fn ?? h.fechaNacimientoPdf417
   );
 }
 
-/// True si [crudo] tiene forma de DNI válida y sin bytes corruptos.
+/// True si [crudo] tiene forma de DNI válida y sin bytes corruptos. Vale para
+/// los dos formatos; exige DNI reconocible, no sexo.
 bool cadenaEsLecturaPlausibleDniArgentino(String crudo) {
   final s = crudo.trim();
   if (s.isEmpty || !s.contains('@')) return false;

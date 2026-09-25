@@ -1859,16 +1859,17 @@ class _VacunasPageState extends State<VacunasPage> {
     );
   }
 
-  /// Orden de una dosis a partir de su nombre ("1ra Dosis" -> 1, "Refuerzo"
-  /// -> orden alto, después de cualquier dosis numerada). "Unica Dosis" no
-  /// tiene dosis previa, no se evalúa.
+  /// Orden de una dosis a partir de su nombre ("1ra Dosis" -> 1). Los
+  /// refuerzos van después de cualquier dosis numerada y entre sí por su
+  /// número ("Refuerzo" -> 1000, "1er Refuerzo" -> 1001, "2do Refuerzo" ->
+  /// 1002). "Unica Dosis" no tiene dosis previa, no se evalúa.
   int? _ordenDosisPendiente(String? nombre) {
     final n = (nombre ?? '').toLowerCase();
     if (n.contains('unica')) return null;
     final match = RegExp(r'(\d+)').firstMatch(n);
-    if (match != null) return int.parse(match.group(1)!);
-    if (n.contains('refuerzo')) return 999;
-    return null;
+    final numero = match == null ? null : int.parse(match.group(1)!);
+    if (n.contains('refuerzo')) return 1000 + (numero ?? 0);
+    return numero;
   }
 
   /// true si, con el switch activado, existe otra dosis pendiente de la
@@ -3509,10 +3510,10 @@ class _VacunasPageState extends State<VacunasPage> {
       sysdesa10_nro_tramite:
           beneficiarioService.beneficiario!.sysdesa10_nro_tramite,
       sysdesa10_sexo: beneficiarioService.beneficiario!.sysdesa10_sexo,
-      sysdesa10_edad: beneficiarioService.beneficiario!.sysdesa10_edad,
+      sysdesa10_edad: beneficiarioService.edadParaRegistro,
       fecha_aplicacion: _selectFecha.toString(),
       sysdesa10_fecha_nacimiento:
-          beneficiarioService.beneficiario!.sysdesa10_fecha_nacimiento,
+          beneficiarioService.fechaNacimientoParaRegistro,
       vacunador_registrador:
           registradorService.registrador!.flxcore03_dni ==
               vacunadorService.vacunador!.id_sysdesa12

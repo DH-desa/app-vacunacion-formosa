@@ -20,6 +20,21 @@ class _BeneficiariorService {
 
   bool get existeBeneficiario => beneficiarioEstado.value != null;
 
+  /// Edad y fecha que se guardan al registrar la vacuna y se informan a NOMIVAC.
+  /// Primero las validadas al escanear: `wserv_obtener_datos_beneficiario.php`
+  /// devuelve edad fija y fecha vacía cuando la consulta lleva la cadena del DNI.
+  String? get edadParaRegistro {
+    final validada = edadAniosDesdePdf417Escaneado?.trim();
+    if (validada != null && validada.isNotEmpty) return validada;
+    return beneficiario?.sysdesa10_edad;
+  }
+
+  String? get fechaNacimientoParaRegistro {
+    final validada = fechaNacimientoDesdePdf417Escaneado?.trim();
+    if (validada != null && validada.isNotEmpty) return validada;
+    return beneficiario?.sysdesa10_fecha_nacimiento;
+  }
+
   /// Edad en días de vida (`wserv_listados_vacunas.php` la espera así, a
   /// diferencia del resto de la app que usa años). Prioridad PDF417 sobre
   /// dato del API, igual criterio que [edadAniosDesdePdf417Escaneado].

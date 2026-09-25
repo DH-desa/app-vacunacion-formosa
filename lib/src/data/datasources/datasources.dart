@@ -2,6 +2,7 @@ export 'package:sistema_vacunacion/src/data/datasources/login_providers.dart';
 export 'package:sistema_vacunacion/src/data/datasources/datoscarga_providers.dart';
 export 'package:sistema_vacunacion/src/data/datasources/vacunador_providers.dart';
 export 'package:sistema_vacunacion/src/data/datasources/beneficiario_providers.dart';
+export 'package:sistema_vacunacion/src/data/datasources/identificacion_providers.dart';
 export 'package:sistema_vacunacion/src/data/datasources/vacunas/infovacunas_providers.dart';
 export 'package:sistema_vacunacion/src/data/datasources/vacunas/lotesvacunas_providers.dart';
 export 'package:sistema_vacunacion/src/data/datasources/vacunas/vacunasxperfiles_providers.dart';

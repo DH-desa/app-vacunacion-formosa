@@ -5,6 +5,9 @@
 /// Extraído de `vacunas_page.dart` (`_edadNumericaBeneficiario` y
 /// `_edadAniosDesdeFechaNacimiento`) para reutilizarlo en el clasificador
 /// del calendario de vacunación sin duplicar la lógica de parseo.
+library;
+
+import 'package:sistema_vacunacion/src/utils/edad_pdf417_dni_arg.dart';
 
 /// Edad numérica desde el WS (`8`, `"12"`, `"8 años"`, etc.).
 /// Valores > 120 se ignoran (a veces mandan año de nacimiento en el campo edad).
@@ -22,8 +25,9 @@ int? parseEdadAnios(String? raw) {
 }
 
 /// Fecha de nacimiento desde el WS, formatos `yyyy-MM-dd` (con o sin hora),
-/// `d/M/yyyy` o `d-M-yyyy`. No calcula edad, solo parsea el `DateTime`.
-DateTime? parseFechaNacimiento(String? raw) {
+/// `d/M/yyyy`, `d-M-yyyy` o `d/M/yy` (QR 2026). No calcula edad, solo parsea
+/// el `DateTime`. Con año de 2 dígitos y siglo ambiguo devuelve `null`.
+DateTime? parseFechaNacimiento(String? raw, {DateTime? hoy}) {
   if (raw == null) return null;
   final s = raw.toString().trim();
   if (s.isEmpty) return null;
@@ -39,6 +43,18 @@ DateTime? parseFechaNacimiento(String? raw) {
       final y = int.tryParse(m.group(3)!);
       if (d != null && mo != null && y != null) {
         dt = DateTime(y, mo, d);
+      }
+    }
+  }
+  if (dt == null) {
+    final m = RegExp(r'^(\d{1,2})[/-](\d{1,2})[/-](\d{2})$').firstMatch(s);
+    if (m != null) {
+      final d = int.tryParse(m.group(1)!);
+      final mo = int.tryParse(m.group(2)!);
+      final yy = int.tryParse(m.group(3)!);
+      if (d != null && mo != null && yy != null) {
+        final anios = aniosPlausiblesParaDosDigitos(yy, hoy: hoy);
+        if (anios.length == 1) dt = DateTime(anios.first, mo, d);
       }
     }
   }

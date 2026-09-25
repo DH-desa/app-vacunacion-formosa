@@ -80,13 +80,11 @@ class MyApp extends StatelessWidget {
       builder: (context, child) {
         final clamped = MediaQuery(
           data: MediaQuery.of(context).copyWith(
-            // Raíz del problema "se ve chico / se ve grande / salta de línea":
-            // el usuario puede tener escala de fuente del OS hasta 2x; sin tope
-            // los `Text` rompen layouts calibrados a 1.0x. Tope 1.3 = inclusivo
-            // sin destruir el diseño.
+            // Limitar solo el máximo: los widgets de Flutter pueden aplicar
+            // límites menores al mismo TextScaler (por ejemplo, el calendario).
             textScaler: MediaQuery.textScalerOf(
               context,
-            ).clamp(minScaleFactor: 1.0, maxScaleFactor: 1.3),
+            ).clamp(maxScaleFactor: 1.3),
           ),
           child: env == 'DEV' ? DevOverlay(child: child!) : child!,
         );

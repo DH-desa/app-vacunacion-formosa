@@ -46,6 +46,18 @@ class _InsertRegistro {
       );
       if (resp.statusCode == 200) {
         final decodedData = json.decode(decodificarRespuestaHTTP(resp.bodyBytes));
+        // PRUEBA EN CURSO: la copia de prueba seca devuelve acá lo que habría
+        // escrito y lo que le habría mandado a NOMIVAC, sin ejecutarlo.
+        if (decodedData is Map && decodedData['prueba_seca'] != null) {
+          for (final captura in (decodedData['prueba_seca'] as List)) {
+            devLogService.log(
+              DevLogTipo.info,
+              'prueba_seca',
+              '${(captura as Map)['tipo']}',
+              datos: {'detalle': captura['sql'] ?? captura['payload']},
+            );
+          }
+        }
         final mensaje = MensajeServidor.fromJsonList(decodedData['mensajes']);
         return mensaje.items;
       }

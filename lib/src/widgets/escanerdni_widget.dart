@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart' show debugPrint, kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
@@ -47,11 +46,127 @@ class _EscanerDniState extends State<EscanerDni> {
   String? dniPersona;
   String? numeroTramite;
   String? codigodebarras;
-  String sexoPersona = "F";
+  /// `null` mientras no se sepa: el QR no trae el campo. Sin default, que
+  /// registraría un sexo inventado y elegiría el esquema de vacunación.
+  String? sexoPersona;
+
+  /// Lo que confirmó el operador en el panel. Gana sobre el del código: cuando
+  /// vino del documento son el mismo valor, y cuando no vino, es el único.
+  String? _sexoDesdePanel;
 
   /// Desde el PDF417 (fecha nac. del DNI).
   String? _fechaNacPdf417Escaneo;
   String? _edadAniosPdf417Escaneo;
+
+  /// Identifica a la persona contra el recurso local y RENAPER: resuelve el sexo
+  /// cuando el código no lo trae (QR), avisa cuando el del documento no coincide,
+  /// y devuelve la fecha de nacimiento con año de cuatro dígitos.
+  /// `false` = no se puede seguir con la consulta.
+  Future<bool> _identificarPersona() async {
+    if (dniPersona == null) return false;
+    IdentificacionBeneficiario ident;
+    try {
+      ident = await identificacionProviders.identificar(dniPersona!, sexoPersona);
+    } catch (_) {
+      // Sin identificación no hay sexo para el QR; con PDF417 el documento lo trae
+      // y se sigue con ese, como antes de esta validación.
+      if (sexoPersona == null) {
+        await _avisarIdentificacionSinRespuesta();
+        return false;
+      }
+      return true;
+    }
+    if (!mounted) return false;
+
+    if (!ident.identificada) {
+      if (sexoPersona == null) {
+        await _avisarIdentificacionSinRespuesta(mensaje: ident.mensaje);
+        return false;
+      }
+      return true;
+    }
+
+    if (ident.estado == 'sexo_no_coincide') {
+      final seguir = await _confirmarSexoCorregido(ident);
+      if (seguir != true) return false;
+    }
+
+    setState(() {
+      sexoPersona = ident.sexo;
+      if (ident.apellido.isNotEmpty) apellidoPersona = ident.apellido;
+      if (ident.nombre.isNotEmpty) nombrePersona = ident.nombre;
+      if (ident.nroTramite.isNotEmpty) numeroTramite = ident.nroTramite;
+      // La fecha validada reemplaza a la del código: el QR trae el año con dos
+      // dígitos y de la edad depende qué vacunas se ofrecen.
+      if (ident.fechaNacimiento.isNotEmpty) {
+        _fechaNacPdf417Escaneo = ident.fechaNacimiento;
+      }
+      if (ident.edadAnios.isNotEmpty) _edadAniosPdf417Escaneo = ident.edadAnios;
+    });
+    return true;
+  }
+
+  Future<bool?> _confirmarSexoCorregido(IdentificacionBeneficiario ident) {
+    return showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext ctx) => DialogoAlerta(
+        dosBotones: true,
+        envioFuncion2: true,
+        envioFuncion1: true,
+        funcion1: () => Navigator.of(ctx).pop(true),
+        funcion2: () => Navigator.of(ctx).pop(false),
+        tituloAlerta: 'El sexo no coincide',
+        descripcionAlerta:
+            '${ident.mensaje}\n\nSe registrará como ${ident.sexo} '
+            '(${ident.apellido}, ${ident.nombre}).',
+        textoBotonAlerta: 'Continuar',
+        textoBotonAlerta2: 'Cancelar',
+        icon: Icon(Icons.info_outline, size: AppTamanoIcono.grande),
+        color: Theme.of(ctx).colorScheme.error,
+      ),
+    );
+  }
+
+  Future<void> _avisarIdentificacionSinRespuesta({String mensaje = ''}) async {
+    if (!mounted) return;
+    await showDialog<void>(
+      context: context,
+      builder: (BuildContext ctx) => DialogoAlerta(
+        envioFuncion2: false,
+        envioFuncion1: false,
+        tituloAlerta: 'No se pudo validar la identidad',
+        descripcionAlerta: mensaje.isNotEmpty
+            ? mensaje
+            : 'No se pudo confirmar los datos de la persona. Intente de nuevo o '
+                  'cárguela por D.N.I. desde la opción manual.',
+        textoBotonAlerta: 'Listo',
+        icon: Icon(Icons.info_outline, size: AppTamanoIcono.grande),
+        color: Theme.of(ctx).colorScheme.error,
+      ),
+    );
+  }
+
+  /// Red de seguridad: el panel no deja confirmar sin sexo, así que no debería
+  /// alcanzarse. Queda porque consultar con sexo vacío escribe en una historia
+  /// clínica, y eso no puede depender de una sola barrera.
+  Future<void> _avisarSexoNoDisponible() async {
+    if (!mounted) return;
+    await showDialog<void>(
+      context: context,
+      builder: (BuildContext ctx) => DialogoAlerta(
+        envioFuncion2: false,
+        envioFuncion1: false,
+        tituloAlerta: 'Falta el sexo',
+        descripcionAlerta:
+            'No se pudo determinar el sexo de la persona. Escanee de nuevo o '
+            'cárguela por D.N.I. desde la opción manual.',
+        textoBotonAlerta: 'Listo',
+        icon: Icon(Icons.info_outline, size: AppTamanoIcono.grande),
+        color: Theme.of(ctx).colorScheme.error,
+      ),
+    );
+  }
 
   Future<void> _mostrarSinConexionRed() async {
     if (!mounted) return;
@@ -110,19 +225,28 @@ class _EscanerDniState extends State<EscanerDni> {
   }
 
   Future<void> scanBarcodeNormal() async {
-    final String? barcodeScanRes = await Navigator.push<String>(
+    // Beneficiario y Tutor verifican en cámara antes de consultar: son los que
+    // mandan sexo a la API y los únicos que pueden necesitar elegirlo.
+    final pideConfirmacion =
+        widget.tipoEscaneo == 'Beneficiario' || widget.tipoEscaneo == 'Tutor';
+
+    final resultado = await Navigator.push<ResultadoEscaneoDni>(
       context,
-      MaterialPageRoute<String>(builder: (context) => const _ScannerPage()),
+      MaterialPageRoute<ResultadoEscaneoDni>(
+        builder: (context) => _ScannerPage(confirmarAntesDeSalir: pideConfirmacion),
+      ),
     );
 
     if (!mounted) return;
 
     // -1 equivale a cancelado.
-    if (barcodeScanRes == null || barcodeScanRes == '-1') {
+    if (resultado == null || resultado.cadena == '-1') {
       loadingLoginService.cargarEstado(false);
       return;
     }
 
+    final barcodeScanRes = resultado.cadena;
+    _sexoDesdePanel = resultado.sexo;
     _cadenaPdf417Cruda = barcodeScanRes;
     conSplit = barcodeScanRes.split('@');
 
@@ -336,6 +460,15 @@ class _EscanerDniState extends State<EscanerDni> {
           break;
         }
 
+        // El QR no trae el sexo y trae el año con dos dígitos: la identificación
+        // resuelve las dos cosas antes de consultar los datos del beneficiario.
+        if (!await _identificarPersona()) break;
+        if (!mounted) break;
+        if (sexoPersona == null) {
+          await _avisarSexoNoDisponible();
+          break;
+        }
+
         // La situación (embarazada/puérpera/personal de salud) se pide antes
         // de llamar al webservice: viaja en esa misma consulta.
         final situacion = await _pedirSituacionBeneficiario();
@@ -408,6 +541,18 @@ class _EscanerDniState extends State<EscanerDni> {
             ),
           );
           loadingLoginService.cargarEstado(false);
+          break;
+        }
+
+        // Misma identificación que Beneficiario: también consulta con sexo.
+        if (!await _identificarPersona()) {
+          loadingLoginService.cargarEstado(false);
+          break;
+        }
+        if (!mounted) break;
+        if (sexoPersona == null) {
+          loadingLoginService.cargarEstado(false);
+          await _avisarSexoNoDisponible();
           break;
         }
 
@@ -508,11 +653,13 @@ class _EscanerDniState extends State<EscanerDni> {
   _pedirSituacionBeneficiario() {
     CondicionGestacional? condicion;
     var personalSalud = false;
-    final etiquetaSexo = sexoPersona == 'M'
-        ? 'Masculino'
-        : sexoPersona == 'X'
-        ? 'No binario (X)'
-        : 'Femenino';
+    // 'F' explícito: un else mostraría "Femenino" cuando el dato falta.
+    final etiquetaSexo = switch (sexoPersona) {
+      'M' => 'Masculino',
+      'F' => 'Femenino',
+      'X' => 'No binario (X)',
+      _ => 'Sin especificar',
+    };
     return showDialog<({CondicionGestacional? condicion, bool personalSalud})>(
       context: context,
       barrierDismissible: false,
@@ -666,7 +813,7 @@ class _EscanerDniState extends State<EscanerDni> {
         apellidoPersona = datos.apellido;
         nombrePersona = datos.nombre;
         dniPersona = datos.dni;
-        sexoPersona = datos.sexo;
+        sexoPersona = datos.sexo ?? _sexoDesdePanel;
         numeroTramite = datos.tramite;
         codigodebarras = cadenaApi;
         _fechaNacPdf417Escaneo = datos.fechaNacimientoPdf417;
@@ -708,21 +855,28 @@ class _EscanerDniState extends State<EscanerDni> {
       mensaje,
       datos: camposLog,
     );
-    // Ver nota en encoding_utils.dart: el Dev Log Panel no es alcanzable en
-    // este build (enviroment queda en 'PROD'); esto va a consola además.
-    if (kDebugMode) {
-      debugPrint('[EscanerDNI/campos] $mensaje · $camposLog');
-    }
   }
 }
 
-/// Resultado del parseo del PDF417 para uso interno del escáner.
-/// El DNI argentino usa exclusivamente PDF417. Code128/Code93 corresponden a
-/// licencias de conducir y productos — incluirlos triplica el trabajo nativo por frame.
-const int _kFormatosCodigoDniArgentino = Format.pdf417;
+/// PDF417 (documentos vigentes) y QR (electrónico 2026). Conviven, así que el
+/// lector acepta los dos. Code128/Code93 quedan afuera: son licencias y
+/// productos, y cada formato extra cuesta trabajo nativo por frame.
+const int _kFormatosCodigoDniArgentino = Format.pdf417 | Format.qrCode;
+
+/// Lo que devuelve la cámara. El sexo viaja aparte de la cadena porque en el
+/// QR no sale del código: lo elige el operador en el panel.
+class ResultadoEscaneoDni {
+  const ResultadoEscaneoDni(this.cadena, this.sexo);
+  final String cadena;
+  final String? sexo;
+}
 
 class _ScannerPage extends StatefulWidget {
-  const _ScannerPage();
+  const _ScannerPage({this.confirmarAntesDeSalir = false});
+
+  /// Beneficiario y Tutor verifican la lectura antes de consultar; Registrador
+  /// y Vacunador salen directo porque solo usan el DNI.
+  final bool confirmarAntesDeSalir;
 
   @override
   State<_ScannerPage> createState() => _ScannerPageState();
@@ -741,6 +895,11 @@ class _ScannerPageState extends State<_ScannerPage> {
   // Guard para evitar múltiples pops — onScan puede dispararse varias veces
   // mientras el widget todavía está en el árbol al momento de navegar.
   bool _detected = false;
+
+  /// Lectura esperando confirmación en el panel.
+  String? _cadenaPendiente;
+  DatosDniPdf417? _datosPendientes;
+  String? _sexoElegido;
 
   Timer? _timerConsejo;
   bool _mostrarConsejoLargo = false;
@@ -801,12 +960,34 @@ class _ScannerPageState extends State<_ScannerPage> {
 
   // No llamar a stopImageStream() acá: dispose() de flutter_zxing ya lo hace
   // y llamarlo dos veces rompe con CameraException (reader_widget.dart:318).
-  void _onDetected(String rawValue) {
+  void _onDetected(String rawValue, String? sexo) {
     if (_detected || !mounted) return;
     _detected = true;
     _timerConsejo?.cancel();
     HapticFeedback.mediumImpact();
-    Navigator.of(context).pop(rawValue);
+    Navigator.of(context).pop(ResultadoEscaneoDni(rawValue, sexo));
+  }
+
+  /// Abre el panel en vez de salir. El sexo del documento se precarga; si no
+  /// vino (QR), queda en null y el botón de confirmar no se habilita.
+  void _abrirPanel(String cadena, DatosDniPdf417 datos) {
+    _timerConsejo?.cancel();
+    _timerSinDeteccion?.cancel();
+    HapticFeedback.lightImpact();
+    setState(() {
+      _cadenaPendiente = cadena;
+      _datosPendientes = datos;
+      _sexoElegido = datos.sexo;
+    });
+  }
+
+  void _cerrarPanelYReescanear() {
+    setState(() {
+      _cadenaPendiente = null;
+      _datosPendientes = null;
+      _sexoElegido = null;
+    });
+    _iniciarTemporizadorSinDeteccion();
   }
 
   // Feedback cuando se detecta un código que no corresponde al DNI.
@@ -843,10 +1024,12 @@ class _ScannerPageState extends State<_ScannerPage> {
   }
 
   void _procesarCodigoLeido(Code result) {
-    if (_detected) return;
+    if (_detected || _cadenaPendiente != null) return;
     _framesTotalesSesion++;
     _logDiagnosticoFrame(result, exitoso: true, framesFallidosPrevios: _framesFallidosConsecutivos);
     _framesFallidosConsecutivos = 0;
+    // El QR es ASCII con `@`: sale por la primera comprobación y no entra al
+    // reintento Latin-1, que es específico del PDF417.
     final decodificado = decodificarCadenaPdf417Argentino(
       result.rawBytes,
       result.text,
@@ -858,7 +1041,20 @@ class _ScannerPageState extends State<_ScannerPage> {
       return;
     }
     ScaffoldMessenger.of(context).hideCurrentSnackBar();
-    _onDetected(decodificado);
+
+    if (!widget.confirmarAntesDeSalir) {
+      _onDetected(decodificado, null);
+      return;
+    }
+    final datos = parsearPdf417DniArgentino(
+      decodificado.split('@').map((e) => e.trim()).toList(),
+    );
+    // cadenaEsLecturaPlausible ya garantizó que parsea; el null check es por tipo.
+    if (datos == null) {
+      _onDetected(decodificado, null);
+      return;
+    }
+    _abrirPanel(decodificado, datos);
   }
 
   void _onFrameFallido(Code result) {
@@ -898,11 +1094,10 @@ class _ScannerPageState extends State<_ScannerPage> {
       'imageWidth': result.position?.imageWidth,
       'imageHeight': result.position?.imageHeight,
       'error': result.error,
+      // Con dos formatos suben las lecturas espurias: saber cuál las produce.
+      'formato': result.format?.name,
     };
     devLogService.log(DevLogTipo.info, 'EscanerDNI/frame', mensaje, datos: datos);
-    if (kDebugMode) {
-      debugPrint('[EscanerDNI/frame] $mensaje · $datos');
-    }
   }
 
   @override
@@ -1055,7 +1250,152 @@ class _ScannerPageState extends State<_ScannerPage> {
               ),
             ),
           ),
+          if (_cadenaPendiente != null && _datosPendientes != null)
+            _PanelConfirmacionLecturaDni(
+              datos: _datosPendientes!,
+              // Sin sexo en el código (QR) igual se puede confirmar: lo resuelve
+              // la identificación por D.N.I., no el operador.
+              onConfirmar: () => _onDetected(_cadenaPendiente!, _sexoElegido),
+              onEscanearDeNuevo: _cerrarPanelYReescanear,
+              onSalir: () => Navigator.of(context).pop(null),
+            ),
         ],
+      ),
+    );
+  }
+}
+
+/// Verificación antes de consultar: muestra lo leído y, cuando el código no
+/// trajo el sexo (QR), lo pide. El sexo del documento no se puede editar.
+class _PanelConfirmacionLecturaDni extends StatelessWidget {
+  const _PanelConfirmacionLecturaDni({
+    required this.datos,
+    required this.onConfirmar,
+    required this.onEscanearDeNuevo,
+    required this.onSalir,
+  });
+
+  final DatosDniPdf417 datos;
+  /// `null` deshabilita el botón: falta elegir el sexo.
+  final VoidCallback? onConfirmar;
+  final VoidCallback onEscanearDeNuevo;
+  final VoidCallback onSalir;
+
+  static String etiquetaSexo(String? s) => switch (s) {
+    'M' => 'Masculino',
+    'F' => 'Femenino',
+    'X' => 'No binario (X)',
+    _ => 'Sin especificar',
+  };
+
+  Widget _dato(TextTheme tt, String rotulo, String valor, {bool grande = false}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          rotulo,
+          style: tt.labelMedium?.copyWith(
+            color: Colors.white70,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          valor,
+          style: (grande ? tt.headlineSmall : tt.titleMedium)?.copyWith(
+            color: Colors.white,
+            fontWeight: grande ? FontWeight.w800 : FontWeight.w600,
+            letterSpacing: grande ? 0.5 : 0,
+          ),
+        ),
+      ],
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final tt = Theme.of(context).textTheme;
+    final sexoVinoDelDocumento = datos.sexo != null;
+    final nombreCompleto = '${datos.apellido}, ${datos.nombre}'.trim();
+
+    return Positioned.fill(
+      child: Material(
+        color: Colors.black.withValues(alpha: 0.86),
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: IconButton(
+                      onPressed: onSalir,
+                      icon: const Icon(Icons.close, color: Colors.white),
+                      tooltip: 'Cerrar cámara',
+                    ),
+                  ),
+                  Text(
+                    'Verificar lectura',
+                    textAlign: TextAlign.center,
+                    style: tt.titleLarge?.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(AppEspaciado.radioBoton),
+                      border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _dato(tt, 'D.N.I.', datos.dni, grande: true),
+                        if (nombreCompleto.length > 2) ...[
+                          const SizedBox(height: 14),
+                          _dato(tt, 'Nombre', nombreCompleto),
+                        ],
+                        const SizedBox(height: 14),
+                        if (sexoVinoDelDocumento)
+                          _dato(tt, 'Sexo registrado', etiquetaSexo(datos.sexo))
+                        else
+                          Text(
+                            'El QR no incluye el sexo: se valida por D.N.I. al continuar',
+                            style: tt.labelMedium?.copyWith(
+                              color: Colors.white70,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  FilledButton(
+                    onPressed: onConfirmar,
+                    style: AppBotones.estiloFilledCta(),
+                    child: const Text('Confirmar y continuar'),
+                  ),
+                  const SizedBox(height: AppEspaciado.sm),
+                  OutlinedButton(
+                    onPressed: onEscanearDeNuevo,
+                    style: AppBotones.estiloOutlinedSobreOscuro(),
+                    child: const Text('Escanear de nuevo'),
+                  ),
+                  TextButton(
+                    onPressed: onSalir,
+                    style: AppBotones.estiloTextoSobreOscuro(),
+                    child: const Text('Salir sin cargar'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }

@@ -55,16 +55,17 @@ android {
             applicationIdSuffix ".demo"
             versionNameSuffix "-demo"
             manifestPlaceholders = [appLabel: "DEMO Sistema Vacunación"]
+            signingConfig signingConfigs.debug
         }
         prod {
             dimension "env"
             manifestPlaceholders = [appLabel: "Sistema Vacunación"]
+            signingConfig signingConfigs.release
         }
     }
 
     buildTypes {
         release {
-            signingConfig signingConfigs.release
             minifyEnabled true
             shrinkResources true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'

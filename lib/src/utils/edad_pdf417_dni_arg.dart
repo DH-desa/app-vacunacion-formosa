@@ -1,25 +1,71 @@
-/// Fecha de nacimiento y edad a partir del PDF417 del DNI argentino (no del API).
+/// Fecha de nacimiento y edad desde el código del DNI (no del API). El QR 2026
+/// trae el año con dos dígitos, y eso abre una ambigüedad de siglo.
+
+/// Fija el borde inferior de la ventana ambigua: más que esto, `19YY` no es creíble.
+const int kEdadMaximaPlausible = 110;
+
+final _kRegexFechaCuatro = RegExp(r'^(\d{1,2})/(\d{1,2})/(\d{4})$');
+final _kRegexFechaDos = RegExp(r'^(\d{1,2})/(\d{1,2})/(\d{2})$');
+final _kRegexFechaIso = RegExp(r'^\d{4}-\d{2}-\d{2}');
 
 bool pareceFechaNacimientoArg(String s) {
   final t = s.trim();
-  if (t.length < 8) return false;
-  if (RegExp(r'^\d{1,2}/\d{1,2}/\d{4}$').hasMatch(t)) return true;
-  if (RegExp(r'^\d{4}-\d{2}-\d{2}').hasMatch(t)) return true;
+  if (_kRegexFechaCuatro.hasMatch(t)) return true;
+  if (_kRegexFechaDos.hasMatch(t)) return true;
+  if (_kRegexFechaIso.hasMatch(t)) return true;
   return false;
 }
 
-DateTime? _parseFechaArg(String raw) {
+/// Siglos posibles para un año de dos dígitos, sin los imposibles: `20YY`
+/// futuro, `19YY` demasiado viejo.
+List<int> aniosPlausiblesParaDosDigitos(int yy, {DateTime? hoy}) {
+  final ahora = hoy ?? DateTime.now();
+  final candidatos = <int>[];
+  final siglo20 = 2000 + yy;
+  final siglo19 = 1900 + yy;
+  if (siglo20 <= ahora.year) candidatos.add(siglo20);
+  if (ahora.year - siglo19 <= kEdadMaximaPlausible) candidatos.add(siglo19);
+  return candidatos;
+}
+
+/// True si el año admite más de un siglo. Con 2026, la ventana es `16..26`.
+bool anioDosDigitosEsAmbiguo(int yy, {DateTime? hoy}) =>
+    aniosPlausiblesParaDosDigitos(yy, hoy: hoy).length > 1;
+
+/// True si el siglo de [raw] no puede determinarse. El caller prefiere entonces
+/// la fecha del API, y si no la hay, deja la edad indeterminada.
+bool fechaTieneSigloAmbiguo(String? raw, {DateTime? hoy}) {
+  if (raw == null) return false;
+  final m = _kRegexFechaDos.firstMatch(raw.trim());
+  if (m == null) return false;
+  final yy = int.tryParse(m.group(3)!);
+  if (yy == null) return false;
+  return anioDosDigitosEsAmbiguo(yy, hoy: hoy);
+}
+
+DateTime? _parseFechaArg(String raw, {DateTime? hoy}) {
   final s = raw.trim();
-  if (RegExp(r'^\d{4}-\d{2}-\d{2}').hasMatch(s)) {
+  if (_kRegexFechaIso.hasMatch(s)) {
     return DateTime.tryParse(s.length >= 10 ? s.substring(0, 10) : s);
   }
-  final m = RegExp(r'^(\d{1,2})/(\d{1,2})/(\d{4})').firstMatch(s);
-  if (m == null) return null;
-  final d = int.tryParse(m.group(1)!);
-  final mo = int.tryParse(m.group(2)!);
-  final y = int.tryParse(m.group(3)!);
-  if (d == null || mo == null || y == null) return null;
-  return DateTime(y, mo, d);
+  final m4 = _kRegexFechaCuatro.firstMatch(s);
+  if (m4 != null) {
+    final d = int.tryParse(m4.group(1)!);
+    final mo = int.tryParse(m4.group(2)!);
+    final y = int.tryParse(m4.group(3)!);
+    if (d == null || mo == null || y == null) return null;
+    return DateTime(y, mo, d);
+  }
+  final m2 = _kRegexFechaDos.firstMatch(s);
+  if (m2 == null) return null;
+  final d = int.tryParse(m2.group(1)!);
+  final mo = int.tryParse(m2.group(2)!);
+  final yy = int.tryParse(m2.group(3)!);
+  if (d == null || mo == null || yy == null) return null;
+  final candidatos = aniosPlausiblesParaDosDigitos(yy, hoy: hoy);
+  // Ambiguo o sin candidato: no se elige. Decide el caller.
+  if (candidatos.length != 1) return null;
+  return DateTime(candidatos.first, mo, d);
 }
 
 /// Intenta leer la fecha de nacimiento en las posiciones habituales del PDF417.
@@ -52,14 +98,15 @@ String? fechaNacimientoDesdePartesPdf417(List<String> partes) {
   return masAntigua;
 }
 
-/// Años cumplidos desde el texto de fecha del DNI (DD/MM/AAAA o ISO).
-int? aniosCumplidosDesdeFechaNacimientoTexto(String? raw) {
+/// Años cumplidos desde el texto del DNI. `null` si el siglo es ambiguo: de la
+/// edad depende qué vacunas se ofrecen, así que mejor indeterminada que inventada.
+int? aniosCumplidosDesdeFechaNacimientoTexto(String? raw, {DateTime? hoy}) {
   if (raw == null) return null;
   final s = raw.toString().trim();
   if (s.isEmpty) return null;
-  final dt = _parseFechaArg(s);
+  final dt = _parseFechaArg(s, hoy: hoy);
   if (dt == null) return null;
-  final ahora = DateTime.now();
+  final ahora = hoy ?? DateTime.now();
   var anios = ahora.year - dt.year;
   if (ahora.month < dt.month ||
       (ahora.month == dt.month && ahora.day < dt.day)) {

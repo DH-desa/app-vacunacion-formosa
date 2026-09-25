@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show debugPrint, kDebugMode;
 import 'package:http/http.dart' as http;
 
 enum DevLogTipo { apiRequest, apiResponse, apiError, estadoCambiado, info }
@@ -47,6 +48,15 @@ class _DevLogService {
     );
     if (_logs.length > 200) _logs.removeLast();
     _ctrl.add(List.unmodifiable(_logs));
+
+    // El panel in-app solo se ve con el teléfono en la mano. Espejar a la
+    // consola deja el mismo detalle en `flutter run` y en `adb logcat`, que es
+    // donde se diagnostica lo que pasó en una prueba de campo. Solo en debug:
+    // estos registros incluyen datos personales.
+    if (kDebugMode) {
+      final cuerpo = datos == null || datos.isEmpty ? '' : ' · $datos';
+      debugPrint('[$tag] $mensaje$cuerpo');
+    }
   }
 
   void limpiar() {

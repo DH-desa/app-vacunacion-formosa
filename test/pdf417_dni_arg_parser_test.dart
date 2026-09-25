@@ -101,11 +101,21 @@ void main() {
   });
 
   group('Heurística de respaldo (formato desconocido, N variable)', () {
-    test('sin marcador de sexo reconocible, no asume nada (retorna null)', () {
-      final p = ['0001', 'GOMEZ', 'ANA', '99999999999', '30999999'];
-      final d = parsearPdf417DniArgentino(p);
-      expect(d, isNull);
-    });
+    test(
+      'sin marcador de sexo reconocible: extrae el DNI y deja el sexo en null, '
+      'sin asumir ninguno',
+      () {
+        final p = ['0001', 'GOMEZ', 'ANA', '99999999999', '30999999'];
+        final d = parsearPdf417DniArgentino(p);
+
+        // El DNI alcanza para Registrador y Vacunador, que consultan solo por él.
+        expect(d, isNotNull);
+        expect(d!.dni, '30999999');
+        // Lo que nunca se hace es inventar un sexo: Beneficiario y Tutor deben
+        // pedírselo al operador antes de llamar a la API.
+        expect(d.sexo, isNull);
+      },
+    );
 
     test('con sexo X (no binario) reconocido en cualquier posición', () {
       final p = ['0001', 'GOMEZ', 'ANA', 'X', '30999999'];
@@ -162,12 +172,65 @@ void main() {
       expect(cadenaEsLecturaPlausibleDniArgentino(cruda), isTrue);
     });
 
-    test('rechaza una cadena sin @ (otro tipo de código, ej. QR/EAN)', () {
+    test('rechaza una cadena sin @ (ej. EAN de producto)', () {
       expect(cadenaEsLecturaPlausibleDniArgentino('7791234567890'), isFalse);
     });
 
     test('rechaza cadena vacía', () {
       expect(cadenaEsLecturaPlausibleDniArgentino(''), isFalse);
+    });
+  });
+
+  group('QR del DNI electrónico 2026', () {
+    // Estructura y longitudes de una captura real (27 lecturas idénticas en
+    // dispositivo). Los valores personales están anonimizados.
+    const jwt =
+        'eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9'
+        '.eyJpZF90cmFtaXRlIjoiOTEyMzQ1Njc4In0'
+        '.Gf6OKM-1zqrh3Afb6Ac8iXadH3CRa5FBtcNMhr7qQKUa12luSQSXLnJTVVutl-_G8zm';
+    const cadenaQr = '00912345678@GOMEZ@MARIA ELENA@30123456@B@07/02/80@28/07/26@$jwt';
+    List<String> partes(String s) => s.split('@').map((e) => e.trim()).toList();
+
+    test('se reconoce por el JWT, no por la cantidad de campos', () {
+      expect(esLecturaQrDniArgentino(partes(cadenaQr)), isTrue);
+
+      // Un PDF417 de tarjeta nueva también tiene 8 campos y NO debe confundirse.
+      const pdf417Ocho =
+          '00912345678@GOMEZ@MARIA ELENA@F@30123456@A@07/02/1980@10/03/2015';
+      expect(esLecturaQrDniArgentino(partes(pdf417Ocho)), isFalse);
+    });
+
+    test('mapea el layout corrido: DNI en [3] y ejemplar en [4]', () {
+      final d = parsearPdf417DniArgentino(partes(cadenaQr));
+
+      expect(d, isNotNull);
+      expect(d!.formato, FormatoCodigoDni.qr);
+      expect(d.dni, '30123456'); // [3], donde el PDF417 tiene el sexo
+      expect(d.apellido, 'GOMEZ');
+      expect(d.nombre, 'MARIA ELENA');
+      expect(d.tramite, '00912345678');
+    });
+
+    test('no trae sexo y no se inventa uno', () {
+      final d = parsearPdf417DniArgentino(partes(cadenaQr));
+      expect(d!.sexo, isNull);
+    });
+
+    test('extrae apellido, nombre y fecha: son el respaldo si RENAPER no responde', () {
+      final d = parsearPdf417DniArgentino(partes(cadenaQr));
+      expect(d!.apellido, isNotEmpty);
+      expect(d.nombre, isNotEmpty);
+      expect(d.fechaNacimientoPdf417, '07/02/80');
+    });
+
+    test('pasa el filtro de lectura plausible', () {
+      expect(cadenaEsLecturaPlausibleDniArgentino(cadenaQr), isTrue);
+    });
+
+    test('el JWT no se confunde con el apellido por ser el campo más largo', () {
+      final d = parsearPdf417DniArgentino(partes(cadenaQr));
+      expect(d!.apellido, isNot(contains('eyJ')));
+      expect(d.nombre, isNot(contains('eyJ')));
     });
   });
 }

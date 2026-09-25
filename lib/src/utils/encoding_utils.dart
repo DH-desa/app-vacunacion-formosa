@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
-import 'package:flutter/foundation.dart' show debugPrint, kDebugMode;
 import 'package:sistema_vacunacion/src/core/debug/dev_log_service.dart';
 
 /// Devuelve true si el texto tiene señales de mojibake (UTF-8 leído como Latin-1)
@@ -120,11 +119,6 @@ void _logDecodePdf417(
     'PDF417 decodificado: $motivo',
     datos: datos,
   );
-  // El Dev Log Panel solo se monta con enviroment == 'DEV' (ver main.dart);
-  // esta impresión sirve para verlo en `flutter run` / logcat sin tocar eso.
-  if (kDebugMode) {
-    debugPrint('[EscanerDNI/decode] $motivo · $datos');
-  }
 }
 
 /// Decodifica el body de una respuesta HTTP de manera robusta.

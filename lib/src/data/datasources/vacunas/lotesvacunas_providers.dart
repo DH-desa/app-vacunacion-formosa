@@ -5,6 +5,7 @@ import 'dart:convert';
 import 'package:sistema_vacunacion/src/utils/encoding_utils.dart';
 
 import 'package:sistema_vacunacion/src/domain/entities/models.dart';
+import 'package:sistema_vacunacion/src/presentation/state/services.dart';
 
 class _LotesVacunaProviders {
   // ignore: missing_return
@@ -28,6 +29,8 @@ class _LotesVacunaProviders {
     final url =
         Uri(scheme: scheme, host: host, path: urlLoteVacu, queryParameters: {
       'id_sysvacu04': idVacu,
+      // version_6_0 filtra por efector: solo ofrece lotes con stock donde se registra.
+      'id_sysofic01': registradorService.registrador?.rela_sysofic01,
     });
 
     final List<Lotes> resp = await procesarRespuestaDos(url);
